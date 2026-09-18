@@ -12,10 +12,14 @@ runtime dependency.
 - `src/akceo/files.py`: reads user-supplied text files, turning read failures into `DeckError`.
 - `src/akceo/cli.py`: the `akceo` command.
 - `src/akceo/assets/`: the page template, `base.css` (layout rules; all colors and fonts come from
-  theme tokens), and `deck.js` (navigation).
+  theme tokens), `deck.js` (navigation), and `md-viewer.html` (the standalone speaker-notes
+  viewer that `akceo viewer` writes out).
 - `src/akceo/themes/`: built-in themes, one CSS file each. The first-line comment is the
   description `akceo themes` prints.
-- `examples/demo/`: a deck that uses every layout. The end-to-end test builds it.
+- `examples/demo/`: a deck that uses every layout, and its speaker notes. The end-to-end test
+  builds the deck.
+- `docs/`: `syntax.md` (format reference), `speaker-notes.md` (notes setup), `how-it-works.md`
+  (design, with Mermaid diagrams), `branding.md`.
 
 ## Commands
 
@@ -33,4 +37,7 @@ uv run akceo build examples/demo/deck.md
 - `docs/syntax.md` is the format reference. Update it in the same change as any parser, renderer
   or token change.
 - A new theme token goes in `themes.TOKENS`, every built-in theme, and `docs/syntax.md`.
+- `docs/how-it-works.md` describes the modules and pipeline. Update it when either changes.
+- Keep JavaScript escapes such as `\u0000` as text in the assets. A raw control character breaks
+  the page, and a test checks for it.
 - Keep the `Unreleased` section of `CHANGELOG.md` current.

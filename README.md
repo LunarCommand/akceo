@@ -98,6 +98,26 @@ that sets akceo's color and font tokens. The simplest start is a copy of
 [`src/akceo/themes/midnight.css`](src/akceo/themes/midnight.css). The token list is in
 [docs/syntax.md](docs/syntax.md#themes).
 
+## Speaker notes
+
+Keep your notes in a Markdown file and read them in a second browser tab, while you share only
+the deck tab in your call.
+
+```sh
+akceo viewer    # writes md-viewer.html into the current folder
+```
+
+Open `md-viewer.html` next to your deck, for example with Chrome's split view, and open your
+notes file in it. In Chrome and Edge it refreshes by itself when you save the notes.
+`examples/demo/speaker-notes.md` goes with the demo deck. The setup is in
+[docs/speaker-notes.md](docs/speaker-notes.md).
+
+## How it works
+
+[docs/how-it-works.md](docs/how-it-works.md) explains Akceo at three levels: in plain terms,
+from the user's side, and under the hood. It has diagrams of the build pipeline, the data model
+and the notes viewer.
+
 ## Development
 
 ```sh
