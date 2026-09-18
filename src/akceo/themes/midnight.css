@@ -1,0 +1,14 @@
+/* Dark navy with teal and amber accents. */
+:root {
+  --bg: #0b0f16;
+  --line: #23324a;
+  --text: #e8eef6;
+  --muted: #93a4bd;
+  --strong: #fff;
+  --accent: #5eead4;
+  --accent2: #fbbf24;
+  --figure-bg: #fff;
+  --figure-shadow: 0 12px 40px rgba(0,0,0,.5);
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}

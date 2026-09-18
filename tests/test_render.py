@@ -1,0 +1,142 @@
+import textwrap
+from pathlib import Path
+
+from akceo.parse import BREAK, parse
+from akceo.render import inline, render_slide
+
+
+def slide_html(text: str, image_src: str = "") -> str:
+    deck = parse("---\n" + textwrap.dedent(text).lstrip("\n"), Path("deck.md"))
+    return render_slide(deck.slides[0], image_src)
+
+
+def test_inline_markup():
+    assert inline("**b**") == "<b>b</b>"
+    assert inline("***s***") == '<b class="strong">s</b>'
+    assert inline("==hi==") == '<span class="hl">hi</span>'
+    assert inline("((aside))") == '<span class="dim">(aside)</span>'
+    assert inline("a" + BREAK + "b") == "a<br>b"
+
+
+def test_inline_escapes_html_and_protects_code():
+    assert inline("<b> & ≥") == "&lt;b&gt; &amp; &ge;"
+    assert inline("`**x** <y>`") == "<code>**x** &lt;y&gt;</code>"
+    assert inline("`a` and **b**") == "<code>a</code> and <b>b</b>"
+
+
+def test_title_slide():
+    html = slide_html("""
+        layout: title
+        kicker: Hello
+        meta: A subtitle
+
+        # Big ==Title==
+    """)
+    assert html == "\n".join(
+        [
+            '  <section class="slide title-wrap">',
+            '    <div class="kicker">Hello</div>',
+            '    <h1>Big <span class="hl">Title</span></h1>',
+            '    <div class="rule"></div>',
+            '    <div class="meta">A subtitle</div>',
+            "  </section>",
+        ]
+    )
+
+
+def test_title_slide_without_kicker_or_meta():
+    html = slide_html("layout: title\n\n# Only a title\n")
+    assert "kicker" not in html
+    assert 'class="meta"' not in html
+
+
+def test_bullets_slide():
+    html = slide_html("""
+        kicker: K
+        style-lead: max-width:40ch
+
+        ## Heading
+        > The lead
+        - one
+        - two
+
+        Closing words.
+    """)
+    assert html == "\n".join(
+        [
+            '  <section class="slide">',
+            '    <div class="kicker">K</div>',
+            "    <h2>Heading</h2>",
+            '    <p class="lead" style="max-width:40ch">The lead</p>',
+            "    <ul>",
+            "      <li>one</li>",
+            "      <li>two</li>",
+            "    </ul>",
+            '    <p class="sub">Closing words.</p>',
+            "  </section>",
+        ]
+    )
+
+
+def test_split_slide_renders_blocks_in_order_and_note_last():
+    html = slide_html(
+        """
+        layout: split
+        image: fig.png
+        image-wide: yes
+        image-alt: A "quoted" <figure>
+
+        ## Heading
+        *the note*
+        ### first
+        body one
+        - item
+    """,
+        image_src="data:image/png;base64,AAAA",
+    )
+    assert '<div class="split img-wide">' in html
+    assert '<img src="data:image/png;base64,AAAA" alt="A &quot;quoted&quot; &lt;figure&gt;">' in html
+    phase = html.index('<div class="phase"><h3>first</h3><p>body one</p></div>')
+    item = html.index("<li>item</li>")
+    note = html.index('<p class="note-inline">the note</p>')
+    assert phase < item < note
+
+
+def test_phase_without_description_has_no_empty_paragraph():
+    html = slide_html("layout: split\nimage: x.png\n\n## A\n### solo\n")
+    assert '<div class="phase"><h3>solo</h3></div>' in html
+
+
+def test_steps_slide():
+    html = slide_html("""
+        layout: steps
+        style-sub: margin-top:0
+
+        ## Steps
+        Intro.
+        1. first
+        2. second
+    """)
+    assert '    <p class="sub" style="margin-top:0">Intro.</p>' in html
+    assert '    <ol class="steps">\n      <li>first</li>\n      <li>second</li>\n    </ol>' in html
+
+
+def test_table_slide_dims_last_column_only_when_asked():
+    source = """
+        layout: table
+        {flag}
+
+        ## T
+        | Name | Cost |
+        | **a** | high |
+    """
+    plain = slide_html(source.format(flag=""))
+    dimmed = slide_html(source.format(flag="dim-last-column: yes"))
+    assert "<thead><tr><th>Name</th><th>Cost</th></tr></thead>" in plain
+    assert "<tr><td><b>a</b></td><td>high</td></tr>" in plain
+    assert '<tr><td><b>a</b></td><td class="dim">high</td></tr>' in dimmed
+
+
+def test_style_values_are_attribute_escaped():
+    html = slide_html('style-h2: font-family:"Serif"\n\n## H\n')
+    assert '<h2 style="font-family:&quot;Serif&quot;">H</h2>' in html
