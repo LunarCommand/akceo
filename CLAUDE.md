@@ -9,6 +9,7 @@ runtime dependency.
 - `src/akceo/render.py`: slides to HTML, inline markup, page assembly.
 - `src/akceo/images.py`: image files to data URIs.
 - `src/akceo/themes.py`: theme lookup and the token check.
+- `src/akceo/files.py`: reads user-supplied text files, turning read failures into `DeckError`.
 - `src/akceo/cli.py`: the `akceo` command.
 - `src/akceo/assets/`: the page template, `base.css` (layout rules; all colors and fonts come from
   theme tokens), and `deck.js` (navigation).

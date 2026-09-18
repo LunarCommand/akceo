@@ -55,7 +55,7 @@ A slide starts with `key: value` header lines. Then comes a blank line, then the
 | `image-max` | split | Longest side in pixels after shrinking. Default `2400`. |
 | `image-wide` | split | `yes` gives the image the wider column. |
 | `dim-last-column` | table | `yes` shows the last column in muted text. |
-| `style-h1`, `style-h2`, `style-lead`, `style-ul`, `style-ol`, `style-sub` | all | Inline CSS for that element, for one-off spacing fixes. `style-sub` applies to the paragraph. |
+| `style-h1`, `style-h2`, `style-lead`, `style-ul`, `style-ol`, `style-sub` | all | Inline CSS for that element, for one-off spacing fixes. `style-sub` applies to the paragraph. It can't reference files or URLs. |
 
 ### Layouts
 

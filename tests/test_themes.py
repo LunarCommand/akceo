@@ -35,6 +35,29 @@ def test_missing_theme_file(tmp_path: Path):
         themes.load("nope.css", tmp_path)
 
 
+def test_theme_that_would_close_the_style_block_is_rejected(tmp_path: Path):
+    (tmp_path / "evil.css").write_text(FULL + "/* </STYLE><script>alert(1)</script> */\n")
+    with pytest.raises(DeckError, match="contains '</style'"):
+        themes.load("evil.css", tmp_path)
+
+
+def test_non_utf8_theme_names_the_line(tmp_path: Path):
+    (tmp_path / "brand.css").write_bytes(FULL.encode() + b"/* caf\xe9 */\n")
+    with pytest.raises(DeckError, match=r"brand\.css:14: not valid UTF-8 text; save the theme as UTF-8"):
+        themes.load("brand.css", tmp_path)
+
+
+def test_theme_read_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    (tmp_path / "brand.css").write_text(FULL)
+
+    def denied(self: Path, encoding: str | None = None) -> str:
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(Path, "read_text", denied)
+    with pytest.raises(DeckError, match=r"brand\.css: Permission denied$"):
+        themes.load("brand.css", tmp_path)
+
+
 def test_missing_tokens_are_listed(tmp_path: Path):
     partial = FULL.replace("  --bg: x;\n", "").replace("  --mono: x;\n", "")
     (tmp_path / "partial.css").write_text(partial)

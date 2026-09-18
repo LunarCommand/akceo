@@ -3,8 +3,9 @@
 Build self-contained HTML slide decks from Markdown.
 
 You write slides in one Markdown file and run one command. You get a single HTML file with every
-image shrunk and embedded. It has no external assets, so it opens straight from disk, works
-offline, and survives being emailed or copied anywhere.
+image embedded in it. Large PNG, JPEG and WebP images are shrunk first. The file has no external
+assets, so it opens straight from disk, works offline, and survives being emailed or copied
+anywhere.
 
 ## Install
 

@@ -4,6 +4,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from akceo import files
 from akceo.errors import DeckError
 
 LAYOUTS = ("title", "bullets", "split", "steps", "table")
@@ -57,6 +58,7 @@ LEAD_LINE = re.compile(r"^> (.*)$")
 TABLE_ROW = re.compile(r"^(\|.*)$")
 BLOCK_START = re.compile(r"^(#{1,3} |- |> |\||\d+\. )")
 DELIMITER_CELL = re.compile(r"^:?-+:?$")
+STYLE_URL = re.compile(r"(url|image-set)\s*\(", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -104,13 +106,7 @@ Entry = tuple[int, str, str]  # (line number, key, value)
 
 
 def load(path: Path) -> Deck:
-    try:
-        text = path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        raise DeckError(f"{path}: no such file") from None
-    except OSError as e:
-        raise DeckError(f"{path}: {e.strerror}") from None
-    return parse(text, path)
+    return parse(files.read_text(path, "deck"), path)
 
 
 def parse(text: str, path: Path) -> Deck:
@@ -188,6 +184,8 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
             raise fail(f"'{key}' must be yes or no, not '{value}'", line)
         if key == "image-max" and not (value.isdigit() and int(value) > 0):
             raise fail(f"'image-max' must be a positive whole number of pixels, not '{value}'", line)
+        if key in STYLE_KEYS and STYLE_URL.search(value):
+            raise fail(f"'{key}' can't reference files or URLs (url() or image-set())", line)
     for key in REQUIRED_KEYS.get(layout, ()):
         if key not in meta:
             raise fail(f"the {layout} layout needs an '{key}:' line")

@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from akceo.errors import DeckError
-from akceo.parse import BREAK, Block, Deck, parse
+from akceo.parse import BREAK, Block, Deck, load, parse
 
 
 def deck(text: str) -> Deck:
@@ -191,6 +191,14 @@ def test_paragraph_starting_like_a_block_marker_terminates():
             "'image-max' must be a positive whole",
         ),
         ("---\nlayout: split\n\n## A\n", "slide 1: the split layout needs an 'image:' line"),
+        (
+            "---\nkicker: K\nstyle-h2: background:URL (https://x.test/a.png)\n\n## A\n",
+            "deck.md:3: slide 1: 'style-h2' can't reference files or URLs",
+        ),
+        (
+            '---\nstyle-lead: background-image:image-set("a.png" 1x)\n\n## A\n',
+            "deck.md:2: slide 1: 'style-lead' can't reference files or URLs",
+        ),
         ("---\n## A\n\n| a | b |\n", "slide 1: a | table isn't used by the bullets layout"),
         ("---\n## A\n\n- one\n\nMiddle.\n\n- two\n", "the bullets layout takes only one - list"),
         ("---\nlayout: steps\n\n## A\n\nNo list.\n", "the steps layout needs a 1. list"),
@@ -202,6 +210,12 @@ def test_errors_name_line_and_slide(source: str, message: str):
     with pytest.raises(DeckError) as e:
         parse(source, Path("deck.md"))
     assert message in str(e.value)
+
+
+def test_non_utf8_deck_names_the_line(tmp_path: Path):
+    (tmp_path / "deck.md").write_bytes(b"---\n## A\n\xff\n")
+    with pytest.raises(DeckError, match=r"deck\.md:3: not valid UTF-8 text"):
+        load(tmp_path / "deck.md")
 
 
 def test_split_allows_repeated_phases_and_lists():

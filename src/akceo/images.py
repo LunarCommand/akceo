@@ -18,9 +18,9 @@ def data_uri(path: Path, max_px: int) -> str:
     as-is."""
     if not path.is_file():
         raise DeckError(f"image not found: {path}")
-    if path.suffix.lower() == ".svg":
-        return _uri("image/svg+xml", path.read_bytes())
     try:
+        if path.suffix.lower() == ".svg":
+            return _uri("image/svg+xml", path.read_bytes())
         with Image.open(path) as opened:
             fmt = opened.format or ""
             if fmt not in MIME:
@@ -33,6 +33,8 @@ def data_uri(path: Path, max_px: int) -> str:
             image.save(buf, format=fmt, **SAVE_OPTIONS[fmt])
     except UnidentifiedImageError:
         raise DeckError(f"not a readable image: {path}") from None
+    except OSError as e:
+        raise DeckError(f"can't read image {path}: {e.strerror or e}") from None
     return _uri(MIME[fmt], buf.getvalue())
 
 

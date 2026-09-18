@@ -4,6 +4,7 @@ import re
 from importlib import resources
 from pathlib import Path
 
+from akceo import files
 from akceo.errors import DeckError
 
 DEFAULT = "midnight"
@@ -41,12 +42,14 @@ def load(spec: str, base: Path) -> str:
         path = base / Path(spec).expanduser()
         if not path.is_file():
             raise DeckError(f"theme file not found: {path}")
-        css, label = path.read_text(encoding="utf-8"), str(path)
+        css, label = files.read_text(path, "theme"), str(path)
     else:
         entry = BUILTIN / f"{spec}.css"
         if not entry.is_file():
             raise DeckError(f"unknown theme '{spec}' (built-in themes: {', '.join(builtin())})")
         css, label = entry.read_text(encoding="utf-8"), spec
+    if re.search(r"</style", css, re.IGNORECASE):
+        raise DeckError(f"theme {label} contains '</style', which would end the page's style block")
     missing = [t for t in TOKENS if not re.search(rf"(?<![\w-])--{re.escape(t)}\s*:", css)]
     if missing:
         raise DeckError(f"theme {label} doesn't set: {', '.join('--' + t for t in missing)}")
