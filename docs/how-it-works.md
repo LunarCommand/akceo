@@ -180,8 +180,8 @@ sequenceDiagram
   JavaScript and images are all inside it.
 - **One runtime dependency.** Pillow, for shrinking images. Everything else is the Python
   standard library, and the page uses plain JavaScript with no framework.
-- **Fail loudly and precisely.** Input is checked before anything is written, and every error
-  names the file and line.
+- **Fail loudly and precisely.** Input is checked before anything is written. Every error names
+  the file it's about, and errors in the deck also give the line and slide.
 - **Content and look are separate.** The deck says what's on each slide; the theme alone decides
   colors and fonts.
 

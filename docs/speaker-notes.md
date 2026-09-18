@@ -62,7 +62,7 @@ web server.
 
 ## Notes format
 
-Any Markdown works. This layout reads well in the viewer:
+The viewer renders a common subset of Markdown, listed below. This layout reads well in it:
 
 ```markdown
 # Speaker Notes · My talk
@@ -81,7 +81,7 @@ What to say on the first slide.
 - An italic part in a heading, like `*(0:30)*`, shows in small amber type. It's a good spot for
   a time budget.
 
-The viewer handles:
+The viewer renders:
 - headings
 - paragraphs
 - **bold**, *italic* and `code`
@@ -92,6 +92,9 @@ The viewer handles:
 - quotes
 - fenced code blocks
 - horizontal rules
+
+Raw HTML shows as plain text, and other Markdown extensions, such as strikethrough, task lists
+and footnotes, aren't rendered.
 
 Only `http`, `https`, `mailto` and relative links become clickable. Links open in a new tab.
 

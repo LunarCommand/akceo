@@ -66,7 +66,7 @@
 <body>
 <header>
   <span class="name"><span class="idle">No file loaded</span></span>
-  <span id="status"></span>
+  <span id="status" role="status"></span>
   <div class="fsz"><button id="minus" title="Smaller text">A&minus;</button><button id="plus" title="Larger text">A+</button></div>
   <button id="open" class="accent">Open .md</button>
   <input id="file" type="file" accept=".md,.markdown,.txt,text/markdown" hidden>
@@ -202,24 +202,33 @@
     main.scrollTop=keepScroll?top:0;
   }
 
-  var handle=null,lastMod=0;
+  // Reads finish out of order. Each open bumps the generation, and a read only renders if its
+  // generation is still current, so the latest selection always wins.
+  var handle=null,lastMod=0,generation=0,polling=false;
   function openHandle(h){
+    var gen=++generation;
     return h.getFile().then(function(f){
-      return f.text().then(function(t){handle=h;lastMod=f.lastModified;render(t,f.name,false);setStatus('● watching','on');});
+      return f.text().then(function(t){
+        if(gen!==generation)return;
+        handle=h;lastMod=f.lastModified;render(t,f.name,false);setStatus('● watching','on');
+      });
     });
   }
   function openFile(f){
-    handle=null;
-    f.text().then(function(t){render(t,f.name,false);setStatus(canWatch?'not watching · use Open to watch':'drop again to refresh');});
+    var gen=++generation;handle=null;
+    f.text().then(function(t){
+      if(gen!==generation)return;
+      render(t,f.name,false);setStatus(canWatch?'not watching · use Open to watch':'drop again to refresh');
+    });
   }
   setInterval(function(){
-    if(!handle)return;
-    var h=handle;
+    if(!handle||polling)return;
+    var h=handle,gen=generation;polling=true;
     h.getFile().then(function(f){
-      if(h!==handle||f.lastModified===lastMod)return;
-      lastMod=f.lastModified;
-      return f.text().then(function(t){render(t,f.name,true);});
-    }).catch(function(){if(h===handle){handle=null;setStatus('file unavailable · open it again','warn');}});
+      if(gen!==generation||f.lastModified===lastMod)return;
+      return f.text().then(function(t){if(gen!==generation)return;lastMod=f.lastModified;render(t,f.name,true);});
+    }).catch(function(){if(gen===generation){handle=null;setStatus('file unavailable · open it again','warn');}})
+      .then(function(){polling=false;});
   },1500);
 
   document.getElementById('open').onclick=function(){
