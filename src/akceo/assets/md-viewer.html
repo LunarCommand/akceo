@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Markdown Viewer</title>
+<style>
+  :root{
+    --bg:#0b0f16; --panel:#111925; --line:#22314a; --text:#e8eef6; --muted:#93a4bd;
+    --accent:#5eead4; --accent2:#fbbf24; --warn:#f87171; --fs:18px;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:14px;padding:10px 18px;border-bottom:1px solid var(--line);
+         background:var(--panel);position:sticky;top:0;z-index:5;flex:none}
+  header .name{color:var(--accent);font-family:var(--mono);font-size:13px;overflow:hidden;
+               text-overflow:ellipsis;white-space:nowrap;flex:1}
+  header .name .idle{color:var(--muted)}
+  button{font:inherit;font-size:13px;color:var(--text);background:#1b2740;border:1px solid var(--line);
+         border-radius:7px;padding:6px 12px;cursor:pointer}
+  button:hover{border-color:var(--accent);color:#fff}
+  button.accent{background:var(--accent);color:#06231d;border-color:var(--accent);font-weight:600}
+  .fsz{display:flex;gap:4px}
+  .fsz button{padding:6px 10px}
+  #status{color:var(--muted);font-size:12px;font-family:var(--mono)}
+  #status.on{color:var(--accent2)}
+  #status.warn{color:var(--warn)}
+  main{flex:1;overflow-y:auto}
+  #empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+         gap:14px;color:var(--muted);text-align:center;padding:40px}
+  #empty .big{font-size:22px;color:var(--text)}
+  #content{max-width:80ch;margin:0 auto;padding:40px 48px 120px;font-size:var(--fs);line-height:1.62;display:none}
+  #content h1{font-size:1.9em;margin:.2em 0 .5em;letter-spacing:-.01em;border-bottom:1px solid var(--line);padding-bottom:.2em}
+  #content h2{font-size:1.5em;margin:1.4em 0 .5em;letter-spacing:-.01em}
+  #content h3{font-size:1.2em;margin:1.5em 0 .4em;color:#fff}
+  #content h3 em{color:var(--accent2);font-style:normal;font-size:.82em;font-family:var(--mono)}
+  #content h4{font-size:1.02em;margin:1.2em 0 .3em;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  #content p{margin:.7em 0}
+  #content ul,#content ol{margin:.6em 0 .6em 1.5em}
+  #content li{margin:.32em 0}
+  #content li>ul,#content li>ol{margin:.2em 0 .2em 1.3em}
+  #content img{max-width:100%;height:auto;border-radius:8px}
+  #content strong{color:#fff}
+  #content em{color:var(--text)}
+  #content a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(94,234,212,.3)}
+  #content a:hover{border-bottom-color:var(--accent)}
+  #content code{font-family:var(--mono);font-size:.88em;background:#182338;color:var(--accent2);
+                padding:2px 6px;border-radius:5px}
+  #content pre{background:#0e1626;border:1px solid var(--line);border-radius:10px;padding:16px;
+               overflow-x:auto;margin:1em 0}
+  #content pre code{background:none;color:#cdd8e6;padding:0;font-size:.86em}
+  #content blockquote{border-left:3px solid var(--accent);background:#0e1626;margin:1em 0;padding:.6em 1.1em;
+                      color:var(--muted);border-radius:0 8px 8px 0}
+  #content hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+  #content table{border-collapse:collapse;width:100%;margin:1em 0;font-size:.92em;display:block;overflow-x:auto}
+  #content th,#content td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+  #content th{background:#0e1626;color:var(--accent);font-size:.85em;letter-spacing:.04em;text-transform:uppercase}
+  #drop{position:fixed;inset:0;background:rgba(11,15,22,.92);border:3px dashed var(--accent);
+        display:none;align-items:center;justify-content:center;font-size:26px;color:var(--accent);z-index:20}
+  #drop.show{display:flex}
+</style>
+</head>
+<body>
+<header>
+  <span class="name"><span class="idle">No file loaded</span></span>
+  <span id="status" role="status"></span>
+  <div class="fsz"><button id="minus" title="Smaller text">A&minus;</button><button id="plus" title="Larger text">A+</button></div>
+  <button id="open" class="accent">Open .md</button>
+  <input id="file" type="file" accept=".md,.markdown,.txt,text/markdown" hidden>
+</header>
+<main>
+  <div id="empty">
+    <div class="big">Open or drop a Markdown file</div>
+    <div id="hint"></div>
+  </div>
+  <article id="content"></article>
+</main>
+<div id="drop">Drop to open</div>
+
+<script>
+(function(){
+  var nameEl=document.querySelector('.name'), statusEl=document.getElementById('status'),
+      main=document.querySelector('main'), content=document.getElementById('content'),
+      empty=document.getElementById('empty'), drop=document.getElementById('drop'),
+      input=document.getElementById('file');
+  // File System Access API: Chrome and Edge, including pages opened from file://.
+  var canWatch=!!window.showOpenFilePicker;
+  document.getElementById('hint').textContent=canWatch
+    ?'It refreshes by itself whenever you save the file.'
+    :'This browser can\'t watch files, so drop the file again to refresh after edits.';
+
+  var fs=parseInt(localStorage.getItem('mdv_fs')||'18',10); applyFontSize();
+  function applyFontSize(){document.documentElement.style.setProperty('--fs',fs+'px');localStorage.setItem('mdv_fs',fs);}
+  document.getElementById('plus').onclick=function(){fs=Math.min(30,fs+1);applyFontSize();};
+  document.getElementById('minus').onclick=function(){fs=Math.max(12,fs-1);applyFontSize();};
+
+  var LIST_ITEM=/^([ \t]*)([-*+]|\d+\.)[ \t]+(.*)$/;
+  function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function safeUrl(url,schemes){
+    // URL parsers drop control characters and spaces, so "java\tscript:" would still run as javascript:.
+    url=url.replace(/[\u0000-\u0020]/g,'');
+    var scheme=url.match(/^([a-z][a-z0-9+.-]*):/i);
+    return scheme&&!schemes.test(scheme[1])?null:url.replace(/"/g,'&quot;');
+  }
+  function link(text,url){
+    url=safeUrl(url,/^(https?|mailto)$/i);
+    return url===null?text:'<a href="'+url+'" target="_blank" rel="noopener">'+text+'</a>';
+  }
+  function image(alt,url){
+    url=safeUrl(url,/^(https?|data)$/i);
+    if(url===null||(/^data:/i.test(url)&&!/^data:image\//i.test(url)))return alt;
+    return '<img src="'+url+'" alt="'+alt.replace(/"/g,'&quot;')+'">';
+  }
+  // [text](url) and ![alt](src). Parentheses inside the URL are matched in pairs.
+  function links(s,hold){
+    var out='',i=0;
+    while(i<s.length){
+      var open=s.indexOf('[',i);
+      if(open<0)break;
+      var close=s.indexOf(']',open);
+      if(close<0)break;
+      var j=close+2,depth=1;
+      if(s.charAt(close+1)==='('){
+        while(j<s.length){if(s[j]==='(')depth++;else if(s[j]===')'&&--depth===0)break;j++;}
+      }
+      if(s.charAt(close+1)!=='('||depth){out+=s.slice(i,open+1);i=open+1;continue;}
+      var isImage=s.charAt(open-1)==='!',text=s.slice(open+1,close),url=s.slice(close+2,j);
+      out+=s.slice(i,isImage?open-1:open)+hold(isImage?image(text,url):link(text,url));
+      i=j+1;
+    }
+    return out+s.slice(i);
+  }
+  // Items indented deeper than the one before nest under it.
+  function listHtml(items){
+    var out='',open=[];
+    items.forEach(function(it){
+      while(open.length&&it.indent<open[open.length-1].indent)out+='</li></'+open.pop().tag+'>';
+      var top=open[open.length-1];
+      if(top&&it.indent===top.indent&&it.tag===top.tag){out+='</li><li>';}
+      else{
+        if(top&&it.indent===top.indent)out+='</li></'+open.pop().tag+'>';
+        open.push({indent:it.indent,tag:it.tag});out+='<'+it.tag+'><li>';
+      }
+      out+=inline(it.text);
+    });
+    while(open.length)out+='</li></'+open.pop().tag+'>';
+    return out;
+  }
+  function inline(s){
+    var held=[];
+    function hold(html){held.push(html);return '\uE000'+(held.length-1)+'\uE000';}
+    s=esc(s);
+    s=s.replace(/`([^`]+)`/g,function(m,c){return hold('<code>'+c+'</code>');});
+    s=links(s,hold);
+    s=s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+    s=s.replace(/(^|[^*])\*([^*\s][^*]*?)\*/g,'$1<em>$2</em>');
+    s=s.replace(/(^|[^\w])_([^_\s][^_]*?)_/g,'$1<em>$2</em>');
+    return s.replace(/\uE000(\d+)\uE000/g,function(m,i){return held[i];});
+  }
+  function splitRow(l){return l.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(function(c){return c.trim();});}
+  function md(src){
+    var lines=src.replace(/\r\n?/g,'\n').split('\n'),out='',i=0,n=lines.length,para=[];
+    function flush(){if(para.length){out+='<p>'+inline(para.join(' '))+'</p>';para=[];}}
+    while(i<n){
+      var line=lines[i];
+      if(/^```/.test(line)){flush();i++;var code=[];while(i<n&&!/^```/.test(lines[i])){code.push(lines[i]);i++;}i++;out+='<pre><code>'+esc(code.join('\n'))+'</code></pre>';continue;}
+      if(/^\s*$/.test(line)){flush();i++;continue;}
+      var h=line.match(/^(#{1,6})\s+(.*)$/);
+      if(h){flush();out+='<h'+h[1].length+'>'+inline(h[2])+'</h'+h[1].length+'>';i++;continue;}
+      if(/^(-{3,}|\*{3,}|_{3,})\s*$/.test(line)){flush();out+='<hr>';i++;continue;}
+      if(/\|/.test(line)&&i+1<n&&/-/.test(lines[i+1])&&/^\s*\|?[\s:|-]+\|?\s*$/.test(lines[i+1])){
+        flush();var head=splitRow(line);i+=2;var rows=[];
+        while(i<n&&/\|/.test(lines[i])&&!/^\s*$/.test(lines[i])){rows.push(splitRow(lines[i]));i++;}
+        out+='<table><thead><tr>'+head.map(function(c){return '<th>'+inline(c)+'</th>';}).join('')+'</tr></thead><tbody>'+
+             rows.map(function(r){return '<tr>'+r.map(function(c){return '<td>'+inline(c)+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table>';continue;}
+      if(/^>\s?/.test(line)){flush();var bq=[];while(i<n&&/^>\s?/.test(lines[i])){bq.push(lines[i].replace(/^>\s?/,''));i++;}out+='<blockquote>'+md(bq.join('\n'))+'</blockquote>';continue;}
+      if(LIST_ITEM.test(line)){
+        flush();var items=[];
+        while(i<n){
+          var m=lines[i].match(LIST_ITEM);
+          if(m){items.push({indent:m[1].replace(/\t/g,'    ').length,tag:/\d/.test(m[2])?'ol':'ul',text:m[3]});i++;}
+          else if(/^[ \t]+\S/.test(lines[i])){items[items.length-1].text+=' '+lines[i].trim();i++;}
+          else if(/^\s*$/.test(lines[i])&&i+1<n&&LIST_ITEM.test(lines[i+1])){i++;}
+          else break;
+        }
+        out+=listHtml(items);continue;
+      }
+      para.push(line);i++;
+    }
+    flush();return out;
+  }
+
+  function setStatus(text,cls){statusEl.textContent=text;statusEl.className=cls||'';}
+  function render(text,name,keepScroll){
+    var top=main.scrollTop;
+    content.innerHTML=md(text);
+    content.style.display='block';empty.style.display='none';
+    nameEl.textContent=name||'document';document.title=(name||'Markdown')+' — Viewer';
+    main.scrollTop=keepScroll?top:0;
+  }
+
+  // Reads finish out of order. Each open bumps the generation, and a read only renders if its
+  // generation is still current, so the latest selection always wins.
+  var handle=null,lastMod=0,generation=0,polling=false;
+  function openHandle(h){
+    var gen=++generation;
+    return h.getFile().then(function(f){
+      return f.text().then(function(t){
+        if(gen!==generation)return;
+        handle=h;lastMod=f.lastModified;render(t,f.name,false);setStatus('● watching','on');
+      });
+    });
+  }
+  function openFile(f){
+    var gen=++generation;handle=null;
+    f.text().then(function(t){
+      if(gen!==generation)return;
+      render(t,f.name,false);setStatus(canWatch?'not watching · use Open to watch':'drop again to refresh');
+    });
+  }
+  setInterval(function(){
+    if(!handle||polling)return;
+    var h=handle,gen=generation;polling=true;
+    h.getFile().then(function(f){
+      if(gen!==generation||f.lastModified===lastMod)return;
+      return f.text().then(function(t){if(gen!==generation)return;lastMod=f.lastModified;render(t,f.name,true);});
+    }).catch(function(){if(gen===generation){handle=null;setStatus('file unavailable · open it again','warn');}})
+      .then(function(){polling=false;});
+  },1500);
+
+  document.getElementById('open').onclick=function(){
+    if(!canWatch){input.click();return;}
+    window.showOpenFilePicker({types:[{description:'Markdown',accept:{'text/markdown':['.md','.markdown','.txt']}}]})
+      .then(function(picks){return openHandle(picks[0]);})
+      .catch(function(err){if(err&&err.name!=='AbortError')input.click();});
+  };
+  input.addEventListener('change',function(e){var f=e.target.files[0];if(f)openFile(f);input.value='';});
+
+  window.addEventListener('dragover',function(e){e.preventDefault();drop.classList.add('show');});
+  window.addEventListener('dragleave',function(e){if(e.relatedTarget===null)drop.classList.remove('show');});
+  window.addEventListener('drop',function(e){
+    e.preventDefault();drop.classList.remove('show');
+    // The drop's data is only readable during this event, so take the file and ask for its handle now.
+    var file=e.dataTransfer.files[0],item=e.dataTransfer.items&&e.dataTransfer.items[0];
+    if(!file)return;
+    var pending=item&&item.getAsFileSystemHandle?item.getAsFileSystemHandle():null;
+    if(!pending){openFile(file);return;}
+    pending.then(function(h){return h&&h.kind==='file'?openHandle(h):openFile(file);})
+           .catch(function(){openFile(file);});
+  });
+})();
+</script>
+</body>
+</html>

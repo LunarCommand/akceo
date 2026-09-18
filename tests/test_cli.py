@@ -7,7 +7,9 @@ from PIL import Image
 
 from akceo.cli import main
 
-DEMO = Path(__file__).parents[1] / "examples" / "demo"
+ROOT = Path(__file__).parents[1]
+DEMO = ROOT / "examples" / "demo"
+EXTERNAL_REF = re.compile(r"""(src|href)=["']?(https?:|//|\.{0,2}/)|<link|@import|url\(""")
 
 
 def test_builds_the_demo_deck_self_contained(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
@@ -19,7 +21,7 @@ def test_builds_the_demo_deck_self_contained(tmp_path: Path, capsys: pytest.Capt
     assert page.count('<section class="slide') == 7
     assert "__SLIDES__" not in page
     assert "data:image/svg+xml;base64," in page
-    assert not re.search(r"""(src|href)=["']?(https?:|//|\.{0,2}/)|<link|@import|url\(""", page)
+    assert not EXTERNAL_REF.search(page)
 
 
 def test_default_output_sits_next_to_the_deck(tmp_path: Path):
@@ -37,9 +39,7 @@ def test_theme_flag_overrides_the_deck(tmp_path: Path):
 def test_deck_paths_resolve_against_the_deck_folder(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     (tmp_path / "talk" / "img").mkdir(parents=True)
     Image.new("RGB", (20, 20)).save(tmp_path / "talk" / "img" / "fig.png")
-    shutil.copy(
-        Path(__file__).parents[1] / "src" / "akceo" / "themes" / "paper.css", tmp_path / "talk" / "brand.css"
-    )
+    shutil.copy(ROOT / "src" / "akceo" / "themes" / "paper.css", tmp_path / "talk" / "brand.css")
     (tmp_path / "talk" / "deck.md").write_text(
         "theme: brand.css\nimages: img\n---\nlayout: split\nimage: fig.png\n\n## Figure\n"
     )
@@ -74,3 +74,34 @@ def test_themes_command(capsys: pytest.CaptureFixture[str]):
     lines = capsys.readouterr().out.splitlines()
     assert lines[0].startswith("midnight  ") and lines[0].endswith("(default)")
     assert lines[1].startswith("paper     ")
+
+
+def test_viewer_is_written_to_the_working_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    monkeypatch.chdir(tmp_path)
+    assert main(["viewer"]) == 0
+    assert capsys.readouterr().out == "wrote md-viewer.html\n"
+    page = (tmp_path / "md-viewer.html").read_text()
+    assert page == (ROOT / "src" / "akceo" / "assets" / "md-viewer.html").read_text()
+    assert "showOpenFilePicker" in page
+    assert not EXTERNAL_REF.search(page)
+
+
+def test_viewer_out_may_be_a_folder_or_a_file(tmp_path: Path):
+    assert main(["viewer", "-o", str(tmp_path)]) == 0
+    assert (tmp_path / "md-viewer.html").is_file()
+    assert main(["viewer", "-o", str(tmp_path / "notes.html")]) == 0
+    assert (tmp_path / "notes.html").is_file()
+
+
+def test_packaged_assets_contain_no_raw_control_characters():
+    # A raw NUL in a JavaScript regex is turned into U+FFFD by the HTML parser, which makes the whole
+    # viewer script a syntax error while every Python test still passes. Escapes must stay as text.
+    package = ROOT / "src" / "akceo"
+    paths = [*package.glob("assets/*"), *package.glob("themes/*.css")]
+    assert len(paths) >= 6
+    for path in paths:
+        text = path.read_text(encoding="utf-8")
+        bad = {hex(ord(c)) for c in text if (ord(c) < 32 and c not in "\n\t") or 0xE000 <= ord(c) <= 0xF8FF}
+        assert not bad, f"{path.name}: {sorted(bad)}"
