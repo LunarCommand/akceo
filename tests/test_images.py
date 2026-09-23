@@ -170,3 +170,43 @@ def test_mermaid_renders_for_real(tmp_path: Path):
     assert data.startswith(b"<svg width=")
     assert b"akceo build" in data
     assert b"@import" not in data and b"url(http" not in data
+
+
+MIDNIGHT = {"bg": "#0b0f16", "line": "#23324a", "text": "#e8eef6", "muted": "#93a4bd", "accent": "#5eead4"}
+
+
+def test_mermaid_config_uses_the_theme_colors():
+    config = images.mermaid_config({**MIDNIGHT, "font": "Inter, sans-serif"})
+    assert config["theme"] == "base"
+    variables = config["themeVariables"]
+    assert variables["background"] == "#0b0f16"
+    assert variables["primaryColor"] == "#23324a"
+    assert variables["primaryBorderColor"] == "#5eead4"
+    assert variables["primaryTextColor"] == variables["textColor"] == "#e8eef6"
+    assert variables["lineColor"] == "#93a4bd"
+    assert variables["fontFamily"] == "Inter, sans-serif"
+    assert variables["darkMode"] is True
+
+
+@pytest.mark.parametrize(
+    ("bg", "dark"), [("#f7f5f0", False), ("#fff", False), ("#123", True), ("black", None)]
+)
+def test_mermaid_dark_mode_follows_the_background(bg: str, dark: bool | None):
+    variables = images.mermaid_config({**MIDNIGHT, "bg": bg, "font": "x"})["themeVariables"]
+    assert variables.get("darkMode") is dark
+
+
+def test_mermaid_config_is_passed_to_mmdc_only_when_given(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    seen: list[str | None] = []
+    monkeypatch.setattr(images.shutil, "which", mmdc_found)
+
+    def run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        seen.append(Path(command[command.index("-c") + 1]).read_text() if "-c" in command else None)
+        Path(command[command.index("-o") + 1]).write_bytes(MERMAID_SVG)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(images.subprocess, "run", run)
+    (tmp_path / "flow.mmd").write_text("flowchart LR\n")
+    data_uri(tmp_path / "flow.mmd", 100)
+    data_uri(tmp_path / "flow.mmd", 100, {"theme": "base"})
+    assert seen == [None, '{"theme": "base"}']

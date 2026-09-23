@@ -170,3 +170,11 @@ def test_image_slide_keeps_the_kicker_at_the_top():
 def test_image_slide_without_an_image_shows_a_placeholder():
     html = slide_html("layout: image\n")
     assert '<div class="figure-full"><div class="placeholder"></div></div>' in html
+
+
+def test_an_unframed_image_is_bare_and_a_placeholder_is_unchanged():
+    html = render_slide(
+        parse("---\nlayout: image\nimage: x.png\n", Path("deck.md")).slides[0], "data:x", False
+    )
+    assert '<img class="bare" src="data:x" alt="">' in html
+    assert "bare" not in render_slide(parse("---\nlayout: image\n", Path("deck.md")).slides[0], "", False)

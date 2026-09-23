@@ -51,6 +51,18 @@ def test_deck_paths_resolve_against_the_deck_folder(tmp_path: Path, monkeypatch:
     assert "--bg: #f7f5f0;" in page
 
 
+def test_image_frame_setting_reaches_the_page(tmp_path: Path):
+    Image.new("RGB", (20, 20)).save(tmp_path / "fig.png")
+    (tmp_path / "deck.md").write_text(
+        "image-frame: no\n---\nlayout: image\nimage: fig.png\n"
+        "---\nlayout: image\nimage-frame: yes\nimage: fig.png\n"
+    )
+    assert main(["build", str(tmp_path / "deck.md")]) == 0
+    page = (tmp_path / "deck.html").read_text()
+    assert page.count('<img class="bare" src="data:image/png') == 1
+    assert page.count('<img src="data:image/png') == 1
+
+
 def test_errors_exit_1_with_a_message(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     assert main(["build", str(tmp_path / "missing.md")]) == 1
     assert capsys.readouterr().err == f"akceo: {tmp_path / 'missing.md'}: no such file\n"

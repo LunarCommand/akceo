@@ -38,6 +38,7 @@ The config block is everything before the first `---`. It may hold only `key: va
 | `title` | Page title shown in the browser tab | The file name without `.md` |
 | `theme` | Built-in theme name, or a path to a `.css` file relative to the deck | `midnight` |
 | `images` | Folder to read slide images from, relative to the deck | The deck's folder |
+| `image-frame` | `no` puts every image straight on the slide, with no panel behind it. See [Images](#images). | `yes` |
 
 ## Slides
 
@@ -54,6 +55,7 @@ A slide starts with `key: value` header lines. Then comes a blank line, then the
 | `image-alt` | split, image | Alt text for the image. |
 | `image-max` | split, image | Longest side in pixels after shrinking. Default `2400`. |
 | `image-wide` | split | `yes` gives the image the wider column. |
+| `image-frame` | split, image | `yes` or `no` for this slide's image, overriding the deck's `image-frame`. |
 | `dim-last-column` | table | `yes` shows the last column in muted text. |
 | `style-h1`, `style-h2`, `style-lead`, `style-ul`, `style-ol`, `style-sub` | all | Inline CSS for that element, for one-off spacing fixes. `style-sub` applies to the paragraph. It can't reference files or URLs. |
 
@@ -138,6 +140,29 @@ The `split` and `image` layouts embed their image in the page.
   own error message.
 
 Other formats stop the build.
+
+### Frames
+
+By default an image sits on a panel in the theme's `--figure-bg` color, with a shadow. Both
+built-in themes use white, which suits screenshots and photos. `image-frame: no` drops the
+panel, so the image sits straight on the slide. Set it in the config block for the whole deck,
+or on one `split` or `image` slide. A slide's setting wins over the deck's.
+
+A Mermaid diagram with no frame is drawn in the deck theme's colors, so it matches the slides:
+
+- node fill: `--line`
+- node border: `--accent`
+- text: `--text`
+- arrows: `--muted`
+- font: `--font`
+
+A diagram in a frame keeps Mermaid's own default colors, which read well on white. Mermaid
+also needs to know whether the background is dark. akceo works that out from `--bg` when it is
+a hex color such as `#0b0f16`. Other color formats leave Mermaid to guess. For finer control,
+start the `.mmd` file with Mermaid's own `%%{init: …}%%` line.
+
+The frame setting doesn't change the image itself. A screenshot with a white background still
+shows white.
 
 A `split` or `image` slide with no `image:` line shows a dashed box where the image will go, so
 you can set up the slide before the image exists. An `image:` that names a missing file still stops the

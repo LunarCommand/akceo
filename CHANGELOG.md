@@ -14,6 +14,8 @@ All notable changes to this project are documented here. The format follows
 - PNG, JPEG and WebP images are shrunk and embedded; SVG is embedded as-is.
 - Mermaid diagrams: `image: flow.mmd` is drawn to SVG at build time with the Mermaid CLI
   (`mmdc`), an optional install.
+- `image-frame: no`, for the whole deck or one slide, drops the white panel behind images.
+  Mermaid diagrams without a frame are drawn in the deck theme's colors.
 - Deck errors name the file, line and slide; theme and image errors name the file. Content a
   layout doesn't use is reported with the list of what that layout takes.
 - The URL hash tracks the current slide: `deck.html#4` opens slide 4, and a reload stays put.

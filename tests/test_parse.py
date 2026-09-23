@@ -316,3 +316,32 @@ def test_image_layout_errors(source: str, message: str):
     with pytest.raises(DeckError) as e:
         parse(source, Path("deck.md"))
     assert message in str(e.value)
+
+
+def test_image_frame_comes_from_the_slide_then_the_deck():
+    d = deck("""
+        image-frame: no
+        ---
+        layout: image
+        ---
+        layout: split
+        image-frame: yes
+
+        ## A
+    """)
+    assert [d.framed(s) for s in d.slides] == [False, True]
+    assert deck("---\nlayout: image\n").framed(deck("---\nlayout: image\n").slides[0])
+
+
+@pytest.mark.parametrize(
+    ("source", "message"),
+    [
+        ("image-frame: off\n---\n## A\n", "deck.md:1: 'image-frame' must be yes or no, not 'off'"),
+        ("---\nlayout: image\nimage-frame: 0\n", "'image-frame' must be yes or no, not '0'"),
+        ("---\nimage-frame: no\n\n## A\n", "'image-frame' only applies to the split and image layouts"),
+    ],
+)
+def test_image_frame_errors(source: str, message: str):
+    with pytest.raises(DeckError) as e:
+        parse(source, Path("deck.md"))
+    assert message in str(e.value)

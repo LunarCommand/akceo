@@ -32,6 +32,7 @@ code { font-family: var(--mono); color: var(--accent2); font-size: .92em; }
 .figure-full { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
 .figure-full .placeholder { width: auto; height: 100%; max-width: 100%; }
 .kicker + .figure-full { margin-top: 2vh; }
+.figwrap img.bare, .figure-full img.bare { background: none; box-shadow: none; padding: 0; border-radius: 0; }
 .phase { border-left: 3px solid var(--accent); padding: .3em 0 .3em 1em; margin-bottom: 2.2vh; }
 .phase h3 { font-size: clamp(16px, 2vw, 25px); color: var(--strong); }
 .phase p { color: var(--muted); font-size: clamp(13px, 1.5vw, 19px); line-height: 1.4; margin-top: .3em; }

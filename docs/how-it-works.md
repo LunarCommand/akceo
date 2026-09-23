@@ -214,7 +214,7 @@ flowchart TD
 | `cli.py` | Parses arguments, runs a command, writes the output, turns `DeckError` into a message and exit code 1 |
 | `render.py` | Runs the build: loads the deck and theme, embeds images, renders each slide, fills the page template |
 | `parse.py` | Turns Markdown into a validated `Deck`. All input rules live here. |
-| `themes.py` | Finds a theme by name or path and checks that it sets every token |
+| `themes.py` | Finds a theme by name or path, checks that it sets every token, and reads the token values that Mermaid diagrams use |
 | `images.py` | Turns an image file into a `data:` URI, shrinking raster images and drawing Mermaid diagrams with `mmdc` |
 | `files.py` | Reads user files, turning read and decode failures into `DeckError` |
 | `errors.py` | `DeckError`, the one exception type the CLI reports to the user |
@@ -233,8 +233,8 @@ sequenceDiagram
     P-->>R: Deck (config + slides)
     R->>T: theme from --theme, else the deck's theme:, else midnight
     T-->>R: theme CSS
-    loop each split slide
-        R->>I: image path, image-max
+    loop each split or image slide
+        R->>I: image path, image-max, theme colors if the image has no frame
         I-->>R: data URI
     end
     R->>R: render slides, fill page.html
@@ -338,7 +338,7 @@ flowchart TD
     start["image: file on a split or image slide"] --> exists{"File exists?"}
     exists -->|no| e1["DeckError: image not found"]
     exists -->|yes| mmd{".mmd?"}
-    mmd -->|yes| mmdc["Run mmdc to draw SVG,<br/>give it a pixel size"]
+    mmd -->|yes| mmdc["Run mmdc to draw SVG, in the theme's<br/>colors if unframed, then give it a pixel size"]
     mmdc -->|"no mmdc, or a<br/>Mermaid error"| e3["DeckError"]
     mmd -->|no| svg{"SVG?"}
     svg -->|yes| raw["Embed the bytes unchanged"]

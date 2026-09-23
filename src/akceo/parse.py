@@ -9,18 +9,18 @@ from akceo.errors import DeckError
 
 LAYOUTS = ("title", "bullets", "split", "steps", "table", "image")
 DEFAULT_LAYOUT = "bullets"
-CONFIG_KEYS = ("title", "theme", "images")
+CONFIG_KEYS = ("title", "theme", "images", "image-frame")
 STYLE_KEYS = ("style-h1", "style-h2", "style-lead", "style-ul", "style-ol", "style-sub")
 COMMON_KEYS = ("layout", "kicker", *STYLE_KEYS)
 LAYOUT_KEYS: dict[str, tuple[str, ...]] = {
     "title": ("meta",),
     "bullets": (),
-    "split": ("image", "image-alt", "image-max", "image-wide"),
+    "split": ("image", "image-alt", "image-max", "image-wide", "image-frame"),
     "steps": (),
     "table": ("dim-last-column",),
-    "image": ("image", "image-alt", "image-max"),
+    "image": ("image", "image-alt", "image-max", "image-frame"),
 }
-FLAG_KEYS = ("image-wide", "dim-last-column")
+FLAG_KEYS = ("image-wide", "dim-last-column", "image-frame")
 
 # Block kinds each layout renders, mapped to whether that kind may appear more than once.
 LAYOUT_BLOCKS: dict[str, dict[str, bool]] = {
@@ -100,6 +100,10 @@ class Deck:
     def title(self) -> str:
         return self.config.get("title", self.path.stem)
 
+    def framed(self, slide: Slide) -> bool:
+        """Whether the slide's image sits in a panel. The slide's image-frame wins over the deck's."""
+        return slide.meta.get("image-frame", self.config.get("image-frame", "yes")) == "yes"
+
     def error(self, slide: Slide, message: str) -> DeckError:
         return _error(self.path, slide.line, f"slide {slide.number}: {message}")
 
@@ -121,6 +125,8 @@ def parse(text: str, path: Path) -> Deck:
             raise _error(
                 path, line, f"unknown config key '{key}' (expected one of: {', '.join(CONFIG_KEYS)})"
             )
+        if key in FLAG_KEYS and value not in ("yes", "no"):
+            raise _error(path, line, f"'{key}' must be yes or no, not '{value}'")
         config[key] = value
     if any(_has_content(line) for line in rest):
         raise _error(

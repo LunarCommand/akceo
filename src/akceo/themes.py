@@ -23,6 +23,7 @@ TOKENS = (
 )
 BUILTIN = resources.files("akceo") / "themes"
 LEADING_COMMENT = re.compile(r"^\s*/\*\s*(.*?)\s*\*/", re.DOTALL)
+TOKEN_VALUE = re.compile(r"(?<![\w-])--([\w-]+)\s*:\s*([^;}]+)")
 
 
 def builtin() -> dict[str, str]:
@@ -54,3 +55,9 @@ def load(spec: str, base: Path) -> str:
     if missing:
         raise DeckError(f"theme {label} doesn't set: {', '.join('--' + t for t in missing)}")
     return css
+
+
+def values(css: str) -> dict[str, str]:
+    """Map each token a theme sets to its value, without the leading --. A later setting wins, as in
+    CSS."""
+    return {name: value.strip() for name, value in TOKEN_VALUE.findall(css)}

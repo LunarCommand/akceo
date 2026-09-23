@@ -63,3 +63,8 @@ def test_missing_tokens_are_listed(tmp_path: Path):
     (tmp_path / "partial.css").write_text(partial)
     with pytest.raises(DeckError, match=r"doesn't set: --bg, --mono$"):
         themes.load("partial.css", tmp_path)
+
+
+def test_values_reads_each_token_and_a_later_setting_wins():
+    css = ':root { --bg: #000; --font: "Inter", sans-serif; }\n.x { --bg: #fff }\n'
+    assert themes.values(css) == {"bg": "#fff", "font": '"Inter", sans-serif'}
