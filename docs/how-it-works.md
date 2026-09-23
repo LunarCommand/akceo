@@ -146,6 +146,9 @@ Open `deck.html` in a browser.
 A thin progress bar runs along the bottom, with a slide counter in the corner. Selecting text
 doesn't change slides, so you can copy from a slide mid-talk.
 
+The address bar shows the current slide as `#N`. A link to `deck.html#4` opens slide 4, and a
+reload after a rebuild brings you back to the slide you were on.
+
 ### Presenting with private notes
 
 Your notes live in a Markdown file. You read them in `md-viewer.html`, a small page that
@@ -361,7 +364,9 @@ Anything else is a bug in Akceo, and it shows a normal Python traceback.
 
 `deck.js` is small. It shows one slide at a time by toggling an `active` class,
 moves the progress bar and counter, and maps keys and clicks to next and previous. A click is
-ignored while text is selected.
+ignored while text is selected. On load it opens the slide named in the URL hash. On each move
+it writes the new number back with `history.replaceState`, so stepping through slides doesn't
+fill the browser history. A hash typed into the address bar moves to that slide.
 
 ### The notes viewer
 
