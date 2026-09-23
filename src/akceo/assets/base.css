@@ -12,7 +12,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
           font-size: clamp(11px, 1.3vw, 15px); margin-bottom: 1.4vh; }
 h1 { font-size: clamp(30px, 5.4vw, 62px); line-height: 1.05; letter-spacing: -.02em; }
 h2 { font-size: clamp(26px, 4vw, 46px); line-height: 1.08; letter-spacing: -.02em; margin-bottom: 2.4vh; }
-.lead { font-size: clamp(20px, 2.7vw, 34px); line-height: 1.32; color: var(--text); max-width: 24ch; }
+.lead { font-size: clamp(20px, 2.7vw, 34px); line-height: 1.32; color: var(--text); max-width: 42ch; }
 .hl { color: var(--accent); }
 .dim { color: var(--muted); }
 .strong { color: var(--strong); }
