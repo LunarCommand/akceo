@@ -119,7 +119,8 @@ def render_slide(slide: Slide, image_src: str = "") -> str:
         out.append("  </section>")
         return "\n".join(out)
 
-    out = ['  <section class="slide">', *kicker_html]
+    # A split slide puts its kicker in the text column, so it stays with the heading.
+    out = ['  <section class="slide">', *(kicker_html if slide.layout != "split" else [])]
     h2 = f"<h2{_style(slide, 'h2')}>{inline(_text(slide, 'h2'))}</h2>"
 
     if slide.layout == "split":
@@ -128,6 +129,7 @@ def render_slide(slide: Slide, image_src: str = "") -> str:
         out.append(f'    <div class="split{wide}">')
         out.append(f'      <div class="figwrap"><img src="{image_src}" alt="{alt}"></div>')
         out.append("      <div>")
+        out.extend("    " + line for line in kicker_html)
         out.append(f"        {h2}")
         for block in slide.blocks:
             if block.kind == "phase":

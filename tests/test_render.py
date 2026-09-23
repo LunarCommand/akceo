@@ -102,6 +102,12 @@ def test_split_slide_renders_blocks_in_order_and_note_last():
     assert phase < item < note
 
 
+def test_split_slide_puts_kicker_in_the_text_column():
+    html = slide_html("layout: split\nimage: x.png\nkicker: K\n\n## A\n")
+    assert html.count('<div class="kicker">K</div>') == 1
+    assert '<div>\n        <div class="kicker">K</div>\n        <h2>A</h2>' in html
+
+
 def test_phase_without_description_has_no_empty_paragraph():
     html = slide_html("layout: split\nimage: x.png\n\n## A\n### solo\n")
     assert '<div class="phase"><h3>solo</h3></div>' in html
