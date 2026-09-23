@@ -67,6 +67,9 @@ Open `deck.html` in a browser to present:
 
 A click while text is selected doesn't change slides, so you can copy text from a slide.
 
+The address bar shows the current slide as `#N`, so `deck.html#4` opens on slide 4 and a reload
+stays on the slide you were on.
+
 `examples/demo/deck.md` uses every layout and markup feature. Build it with
 `akceo build examples/demo/deck.md`.
 

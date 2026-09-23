@@ -13,6 +13,7 @@ All notable changes to this project are documented here. The format follows
 - Built-in `midnight` and `paper` themes. Custom themes are CSS files that set akceo's tokens.
 - PNG, JPEG and WebP images are shrunk and embedded; SVG is embedded as-is.
 - Deck errors name the file, line and slide; theme and image errors name the file.
+- The URL hash tracks the current slide: `deck.html#4` opens slide 4, and a reload stays put.
 - `akceo viewer` writes `md-viewer.html`, a speaker-notes viewer for a second browser tab. In
   Chrome and Edge it refreshes live when the notes file changes.
 - Example speaker notes for the demo deck.
