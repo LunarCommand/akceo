@@ -3,7 +3,8 @@
 Build self-contained HTML slide decks from Markdown.
 
 You write slides in one Markdown file and run one command. You get a single HTML file with every
-image embedded in it. Large PNG, JPEG and WebP images are shrunk first. The file has no external
+image embedded in it. Large PNG, JPEG and WebP images are shrunk first, and Mermaid `.mmd`
+diagrams are drawn to SVG if you have the Mermaid CLI installed. The file has no external
 assets, so it opens straight from disk, works offline, and survives being emailed or copied
 anywhere.
 

@@ -12,6 +12,8 @@ All notable changes to this project are documented here. The format follows
 - Six layouts: `title`, `bullets`, `split`, `steps`, `table` and `image`.
 - Built-in `midnight` and `paper` themes. Custom themes are CSS files that set akceo's tokens.
 - PNG, JPEG and WebP images are shrunk and embedded; SVG is embedded as-is.
+- Mermaid diagrams: `image: flow.mmd` is drawn to SVG at build time with the Mermaid CLI
+  (`mmdc`), an optional install.
 - Deck errors name the file, line and slide; theme and image errors name the file. Content a
   layout doesn't use is reported with the list of what that layout takes.
 - The URL hash tracks the current slide: `deck.html#4` opens slide 4, and a reload stays put.

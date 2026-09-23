@@ -131,11 +131,16 @@ The `split` and `image` layouts embed their image in the page.
   are never enlarged. JPEG and WebP are re-saved at quality 90 and turned upright using their
   EXIF orientation.
 - **SVG** is embedded unchanged.
+- **Mermaid** diagrams in a `.mmd` file are drawn as SVG at build time, then embedded. This
+  needs the Mermaid CLI, which is a separate install: `npm install -g @mermaid-js/mermaid-cli`.
+  Without it, a deck that uses a `.mmd` file stops with a message that says so. Each diagram adds
+  a few seconds to the build. A diagram that Mermaid can't draw stops the build with Mermaid's
+  own error message.
 
 Other formats stop the build.
 
-A `split` or `image` slide with no `image:` line shows a dashed box where the image will go, so you can
-set up the slide before the image exists. An `image:` that names a missing file still stops the
+A `split` or `image` slide with no `image:` line shows a dashed box where the image will go, so
+you can set up the slide before the image exists. An `image:` that names a missing file still stops the
 build.
 
 ## Themes

@@ -183,7 +183,8 @@ sequenceDiagram
 - **Self-contained output.** The built page references no external file or URL. CSS,
   JavaScript and images are all inside it.
 - **One runtime dependency.** Pillow, for shrinking images. Everything else is the Python
-  standard library, and the page uses plain JavaScript with no framework.
+  standard library, and the page uses plain JavaScript with no framework. The Mermaid CLI
+  (`mmdc`) is an optional outside tool, needed only for decks that use `.mmd` diagrams.
 - **Fail loudly and precisely.** Input is checked before anything is written. Every error names
   the file it's about, and errors in the deck also give the line and slide.
 - **Content and look are separate.** The deck says what's on each slide; the theme alone decides
@@ -214,7 +215,7 @@ flowchart TD
 | `render.py` | Runs the build: loads the deck and theme, embeds images, renders each slide, fills the page template |
 | `parse.py` | Turns Markdown into a validated `Deck`. All input rules live here. |
 | `themes.py` | Finds a theme by name or path and checks that it sets every token |
-| `images.py` | Turns an image file into a `data:` URI, shrinking raster images |
+| `images.py` | Turns an image file into a `data:` URI, shrinking raster images and drawing Mermaid diagrams with `mmdc` |
 | `files.py` | Reads user files, turning read and decode failures into `DeckError` |
 | `errors.py` | `DeckError`, the one exception type the CLI reports to the user |
 
@@ -334,15 +335,19 @@ is in [syntax.md](syntax.md#themes).
 
 ```mermaid
 flowchart TD
-    start["image: file on a split slide"] --> exists{"File exists?"}
+    start["image: file on a split or image slide"] --> exists{"File exists?"}
     exists -->|no| e1["DeckError: image not found"]
-    exists -->|yes| svg{"SVG?"}
+    exists -->|yes| mmd{".mmd?"}
+    mmd -->|yes| mmdc["Run mmdc to draw SVG,<br/>give it a pixel size"]
+    mmdc -->|"no mmdc, or a<br/>Mermaid error"| e3["DeckError"]
+    mmd -->|no| svg{"SVG?"}
     svg -->|yes| raw["Embed the bytes unchanged"]
     svg -->|no| fmt{"PNG, JPEG or WebP?"}
     fmt -->|no| e2["DeckError: unsupported format"]
     fmt -->|yes| fix["Rotate upright from EXIF,<br/>shrink to image-max,<br/>never enlarge"]
     fix --> save["Re-save in the same format<br/>(JPEG and WebP at quality 90)"]
     raw --> uri["base64 data: URI in the img src"]
+    mmdc --> uri
     save --> uri
 ```
 

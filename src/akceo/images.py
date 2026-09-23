@@ -2,6 +2,10 @@
 
 import base64
 import io
+import re
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -11,21 +15,26 @@ from akceo.errors import DeckError
 
 MIME = {"PNG": "image/png", "JPEG": "image/jpeg", "WEBP": "image/webp"}
 SAVE_OPTIONS: dict[str, dict[str, Any]] = {"PNG": {}, "JPEG": {"quality": 90}, "WEBP": {"quality": 90}}
+MERMAID_INSTALL = "npm install -g @mermaid-js/mermaid-cli"
+MERMAID_TIMEOUT = 60  # seconds; mmdc starts a headless browser for each diagram
+SVG_ROOT = re.compile(rb"<svg\b[^>]*>")
 
 
 def data_uri(path: Path, max_px: int) -> str:
     """Embed an image, shrinking raster formats so the longest side is at most max_px. SVG is embedded
-    as-is."""
+    as-is, and a Mermaid .mmd file is rendered to SVG first."""
     if not path.is_file():
         raise DeckError(f"image not found: {path}")
     try:
         if path.suffix.lower() == ".svg":
             return _uri("image/svg+xml", path.read_bytes())
+        if path.suffix.lower() == ".mmd":
+            return _uri("image/svg+xml", _mermaid_svg(path))
         with Image.open(path) as opened:
             fmt = opened.format or ""
             if fmt not in MIME:
                 raise DeckError(
-                    f"unsupported image format {fmt or 'unknown'}: {path} (use PNG, JPEG, WebP or SVG)"
+                    f"unsupported image format {fmt or 'unknown'}: {path} (use PNG, JPEG, WebP, SVG or .mmd)"
                 )
             image = ImageOps.exif_transpose(opened)
             image.thumbnail((max_px, max_px))
@@ -36,6 +45,43 @@ def data_uri(path: Path, max_px: int) -> str:
     except OSError as e:
         raise DeckError(f"can't read image {path}: {e.strerror or e}") from None
     return _uri(MIME[fmt], buf.getvalue())
+
+
+def _mermaid_svg(path: Path) -> bytes:
+    """Render a Mermaid diagram to SVG with the Mermaid CLI (mmdc), an optional outside tool."""
+    mmdc = shutil.which("mmdc")
+    if mmdc is None:
+        raise DeckError(f"rendering {path} needs the Mermaid CLI (mmdc): {MERMAID_INSTALL}")
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "diagram.svg"
+        command = [mmdc, "-i", str(path), "-o", str(out), "-b", "transparent", "-q"]
+        try:
+            result = subprocess.run(command, capture_output=True, text=True, timeout=MERMAID_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            raise DeckError(f"Mermaid took over {MERMAID_TIMEOUT}s to render {path}") from None
+        if result.returncode != 0 or not out.is_file():
+            raise DeckError(f"Mermaid couldn't render {path}: {_mermaid_reason(result.stderr)}")
+        return _fixed_size(out.read_bytes())
+
+
+def _mermaid_reason(stderr: str) -> str:
+    """mmdc prints a stack trace after the message; keep the message."""
+    lines = [line.strip() for line in stderr.splitlines() if line.strip()]
+    message = [line for line in lines if not line.startswith("at ")]
+    return " ".join(message[:4]) or "mmdc failed with no message"
+
+
+def _fixed_size(svg: bytes) -> bytes:
+    """Mermaid sizes its SVG as width="100%". Inside an <img> that leaves no natural size, so give the
+    root element a pixel width and height from its viewBox."""
+    root = SVG_ROOT.search(svg)
+    view_box = root and re.search(rb'viewBox="[\d.-]+ [\d.-]+ ([\d.]+) ([\d.]+)"', root.group())
+    if not root or not view_box:
+        return svg
+    width, height = (round(float(v)) for v in view_box.groups())
+    tag = re.sub(rb'\s(width|height)="[^"]*"', b"", root.group())
+    tag = tag.replace(b"<svg", f'<svg width="{width}" height="{height}"'.encode(), 1)
+    return svg[: root.start()] + tag + svg[root.end() :]
 
 
 def _uri(mime: str, data: bytes) -> str:
