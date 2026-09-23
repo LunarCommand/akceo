@@ -233,3 +233,49 @@ def test_split_allows_repeated_phases_and_lists():
         body 2
     """)
     assert [b.kind for b in d.slides[0].blocks] == ["h2", "ul", "phase", "ul", "phase"]
+
+
+def test_author_notes_are_dropped_everywhere():
+    d = deck("""
+        // config note
+        title: T
+        // between config keys
+
+        // after a blank line
+        ---
+        // before the header
+        layout: bullets
+        // among header lines
+        kicker: K
+
+        ## A
+        // between heading and list
+        - one
+        // between items
+        - two
+          // indented under an item
+        - three
+
+        Closing
+        // inside a paragraph
+        words.
+    """)
+    assert d.config == {"title": "T"}
+    slide = d.slides[0]
+    assert slide.meta == {"layout": "bullets", "kicker": "K"}
+    assert slide.blocks == (
+        Block("h2", text="A"),
+        Block("ul", items=("one", "two", "three")),
+        Block("para", text="Closing words."),
+    )
+
+
+def test_author_notes_keep_error_line_numbers():
+    with pytest.raises(DeckError, match=r"deck\.md:5: slide 1: unknown key 'imgae'"):
+        parse("---\n// a\nkicker: K\n// b\nimgae: x.png\n\n## A\n", Path("deck.md"))
+    assert deck("---\n// note\n\n## A\n").slides[0].line == 4
+
+
+def test_a_chunk_of_only_author_notes_is_not_a_slide():
+    d = deck("---\n## One\n---\n// the pricing slide goes here\n---\n## Two\n")
+    assert [s.first("h2") for s in d.slides] == [Block("h2", text="One"), Block("h2", text="Two")]

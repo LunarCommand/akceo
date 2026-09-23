@@ -248,7 +248,7 @@ flowchart LR
     chunks --> slides["Each other chunk:<br/>a slide"]
     slides --> header["Header lines<br/>key: value"]
     slides --> body["Body lines"]
-    body --> logical["Join continuations<br/>(2-space indent, trailing \)"]
+    body --> logical["Drop // notes, then join continuations<br/>(2-space indent, trailing \)"]
     logical --> blocks["Group into blocks<br/>h1 h2 phase ul ol lead table note para"]
     header --> check{"Validate against<br/>the layout's contract"}
     blocks --> check

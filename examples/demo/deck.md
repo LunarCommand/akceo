@@ -15,6 +15,7 @@ kicker: Why
 
 ## Slides are structured text
 
+// Author note: lines that start with // never reach the page.
 - Write in **Markdown**, keep the deck in git, and review it in a diff.
 - Build to a **single HTML file** with images embedded and no external assets.
 - Open it anywhere: a browser, offline, or from an email attachment.

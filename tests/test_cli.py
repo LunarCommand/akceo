@@ -22,6 +22,7 @@ def test_builds_the_demo_deck_self_contained(tmp_path: Path, capsys: pytest.Capt
     assert "__SLIDES__" not in page
     assert "data:image/svg+xml;base64," in page
     assert not EXTERNAL_REF.search(page)
+    assert "Author note" not in page
 
 
 def test_default_output_sits_next_to_the_deck(tmp_path: Path):

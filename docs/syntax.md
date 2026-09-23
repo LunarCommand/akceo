@@ -93,6 +93,23 @@ Two rules join lines:
   items.
 - A trailing `\` joins the next line with a hard line break.
 
+## Author notes
+
+A line whose first non-space characters are `//` is a note to yourself. It never reaches the
+page. Use it for reminders such as "this becomes a split once the diagram exists".
+
+```markdown
+## Integrations
+// TODO: add the partner API row once it ships
+| Path | Returns |
+```
+
+A note can go anywhere: in the config block, among a slide's header lines, or between the
+lines of a list or paragraph. The content around it reads as if the note weren't there, so a
+note between two list items doesn't split the list. A slide that holds only notes is skipped,
+which lets you stub a slide you haven't written yet. There's no escape, so a line of slide text
+can't start with `//`.
+
 ## Inline markup
 
 | Write | Get |
