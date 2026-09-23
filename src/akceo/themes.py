@@ -23,6 +23,7 @@ TOKENS = (
 )
 BUILTIN = resources.files("akceo") / "themes"
 LEADING_COMMENT = re.compile(r"^\s*/\*\s*(.*?)\s*\*/", re.DOTALL)
+CSS_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
 TOKEN_VALUE = re.compile(r"(?<![\w-])--([\w-]+)\s*:\s*([^;}]+)")
 
 
@@ -51,7 +52,8 @@ def load(spec: str, base: Path) -> str:
         css, label = entry.read_text(encoding="utf-8"), spec
     if re.search(r"</style", css, re.IGNORECASE):
         raise DeckError(f"theme {label} contains '</style', which would end the page's style block")
-    missing = [t for t in TOKENS if not re.search(rf"(?<![\w-])--{re.escape(t)}\s*:", css)]
+    declarations = _declarations(css)
+    missing = [t for t in TOKENS if not re.search(rf"(?<![\w-])--{re.escape(t)}\s*:", declarations)]
     if missing:
         raise DeckError(f"theme {label} doesn't set: {', '.join('--' + t for t in missing)}")
     return css
@@ -60,4 +62,9 @@ def load(spec: str, base: Path) -> str:
 def values(css: str) -> dict[str, str]:
     """Map each token a theme sets to its value, without the leading --. A later setting wins, as in
     CSS."""
-    return {name: value.strip() for name, value in TOKEN_VALUE.findall(css)}
+    return {name: value.strip() for name, value in TOKEN_VALUE.findall(_declarations(css))}
+
+
+def _declarations(css: str) -> str:
+    """The CSS without its comments, so a `--token:` written in a comment is neither read nor counted."""
+    return CSS_COMMENT.sub(" ", css)

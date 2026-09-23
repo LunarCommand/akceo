@@ -233,10 +233,11 @@ sequenceDiagram
     P-->>R: Deck (config + slides)
     R->>T: theme from --theme, else the deck's theme:, else midnight
     T-->>R: theme CSS
-    loop each split or image slide
+    loop each split or image slide with an image: line
         R->>I: image path, image-max, theme colors if the image has no frame
         I-->>R: data URI
     end
+    Note over R: a slide with no image: line gets a dashed placeholder instead
     R->>R: render slides, fill page.html
     R-->>CLI: HTML, slide count
     CLI->>CLI: write deck.html, print summary
