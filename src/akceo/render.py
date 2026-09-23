@@ -4,6 +4,7 @@ import html
 import re
 from importlib import resources
 from pathlib import Path
+from typing import Any
 
 from akceo import images, parse, themes
 from akceo.errors import DeckError
@@ -30,8 +31,12 @@ def build(deck_path: Path, theme: str | None = None) -> tuple[str, int]:
         except DeckError as e:
             raise DeckError(f"{deck_path}: {e}") from None
     images_dir = deck_path.parent / Path(deck.config.get("images", ".")).expanduser()
+    mermaid = images.mermaid_config(themes.values(theme_css))
 
-    sections = [render_slide(slide, _image_src(deck, slide, images_dir)) for slide in deck.slides]
+    sections = [
+        render_slide(slide, _image_src(deck, slide, images_dir, mermaid), deck.framed(slide))
+        for slide in deck.slides
+    ]
     values = {
         "TITLE": escape(deck.title),
         "STYLE": _asset("base.css") + "\n" + theme_css,
@@ -46,12 +51,15 @@ def _asset(name: str) -> str:
     return (ASSETS / name).read_text(encoding="utf-8")
 
 
-def _image_src(deck: Deck, slide: Slide, images_dir: Path) -> str:
+def _image_src(deck: Deck, slide: Slide, images_dir: Path, mermaid: dict[str, Any]) -> str:
+    """The slide's image as a data URI. A diagram without a frame is drawn in the theme's colors; one
+    in a frame keeps Mermaid's default look, since theme colors may not read on the frame's white."""
     if "image" not in slide.meta:
         return ""
     max_px = int(slide.meta.get("image-max", DEFAULT_IMAGE_MAX))
     try:
-        return images.data_uri(images_dir / slide.meta["image"], max_px)
+        config = None if deck.framed(slide) else mermaid
+        return images.data_uri(images_dir / slide.meta["image"], max_px, config)
     except DeckError as e:
         raise deck.error(slide, str(e)) from None
 
@@ -106,7 +114,16 @@ def _list(tag: str, items: tuple[str, ...], indent: str, attrs: str = "") -> lis
     ]
 
 
-def render_slide(slide: Slide, image_src: str = "") -> str:
+def _figure(slide: Slide, image_src: str, framed: bool) -> str:
+    """The slide's image, or a dashed box holding its place while there's no image: line yet. An
+    image without a frame gets the bare class, which drops the panel behind it."""
+    if "image" not in slide.meta:
+        return '<div class="placeholder"></div>'
+    bare = "" if framed else ' class="bare"'
+    return f'<img{bare} src="{image_src}" alt="{html.escape(slide.meta.get("image-alt", ""))}">'
+
+
+def render_slide(slide: Slide, image_src: str = "", framed: bool = True) -> str:
     kicker = slide.meta.get("kicker")
     kicker_html = [f'    <div class="kicker">{inline(kicker)}</div>'] if kicker else []
 
@@ -119,15 +136,19 @@ def render_slide(slide: Slide, image_src: str = "") -> str:
         out.append("  </section>")
         return "\n".join(out)
 
-    out = ['  <section class="slide">', *kicker_html]
+    # A split slide puts its kicker in the text column, so it stays with the heading.
+    out = ['  <section class="slide">', *(kicker_html if slide.layout != "split" else [])]
     h2 = f"<h2{_style(slide, 'h2')}>{inline(_text(slide, 'h2'))}</h2>"
 
-    if slide.layout == "split":
+    if slide.layout == "image":
+        out.append(f'    <div class="figure-full">{_figure(slide, image_src, framed)}</div>')
+
+    elif slide.layout == "split":
         wide = " img-wide" if slide.flag("image-wide") else ""
-        alt = html.escape(slide.meta.get("image-alt", ""))
         out.append(f'    <div class="split{wide}">')
-        out.append(f'      <div class="figwrap"><img src="{image_src}" alt="{alt}"></div>')
+        out.append(f'      <div class="figwrap">{_figure(slide, image_src, framed)}</div>')
         out.append("      <div>")
+        out.extend("    " + line for line in kicker_html)
         out.append(f"        {h2}")
         for block in slide.blocks:
             if block.kind == "phase":

@@ -190,7 +190,6 @@ def test_paragraph_starting_like_a_block_marker_terminates():
             "---\nlayout: split\nimage: x.png\nimage-max: big\n\n## A\n",
             "'image-max' must be a positive whole",
         ),
-        ("---\nlayout: split\n\n## A\n", "slide 1: the split layout needs an 'image:' line"),
         (
             "---\nkicker: K\nstyle-h2: background:URL (https://x.test/a.png)\n\n## A\n",
             "deck.md:3: slide 1: 'style-h2' can't reference files or URLs",
@@ -199,7 +198,16 @@ def test_paragraph_starting_like_a_block_marker_terminates():
             '---\nstyle-lead: background-image:image-set("a.png" 1x)\n\n## A\n',
             "deck.md:2: slide 1: 'style-lead' can't reference files or URLs",
         ),
-        ("---\n## A\n\n| a | b |\n", "slide 1: a | table isn't used by the bullets layout"),
+        (
+            "---\n## A\n\n| a | b |\n",
+            "slide 1: a | table isn't used by the bullets layout, which takes a ## heading, "
+            "a > lead, a - list and a paragraph",
+        ),
+        (
+            "---\nlayout: table\n\n## A\n| a | b |\n\nClosing words.\n",
+            "a paragraph isn't used by the table layout, which takes a ## heading and a | table",
+        ),
+        ("---\nlayout: title\n\n## A\n", "isn't used by the title layout, which takes a # heading"),
         ("---\n## A\n\n- one\n\nMiddle.\n\n- two\n", "the bullets layout takes only one - list"),
         ("---\nlayout: steps\n\n## A\n\nNo list.\n", "the steps layout needs a 1. list"),
         ("---\n- no heading\n", "the bullets layout needs a ## heading"),
@@ -233,3 +241,107 @@ def test_split_allows_repeated_phases_and_lists():
         body 2
     """)
     assert [b.kind for b in d.slides[0].blocks] == ["h2", "ul", "phase", "ul", "phase"]
+
+
+def test_author_notes_are_dropped_everywhere():
+    d = deck("""
+        // config note
+        title: T
+        // between config keys
+
+        // after a blank line
+        ---
+        // before the header
+        layout: bullets
+        // among header lines
+        kicker: K
+
+        ## A
+        // between heading and list
+        - one
+        // between items
+        - two
+          // indented under an item
+        - three
+
+        Closing
+        // inside a paragraph
+        words.
+    """)
+    assert d.config == {"title": "T"}
+    slide = d.slides[0]
+    assert slide.meta == {"layout": "bullets", "kicker": "K"}
+    assert slide.blocks == (
+        Block("h2", text="A"),
+        Block("ul", items=("one", "two", "three")),
+        Block("para", text="Closing words."),
+    )
+
+
+def test_author_notes_keep_error_line_numbers():
+    with pytest.raises(DeckError, match=r"deck\.md:5: slide 1: unknown key 'imgae'"):
+        parse("---\n// a\nkicker: K\n// b\nimgae: x.png\n\n## A\n", Path("deck.md"))
+    assert deck("---\n// note\n\n## A\n").slides[0].line == 4
+
+
+def test_a_chunk_of_only_author_notes_is_not_a_slide():
+    d = deck("---\n## One\n---\n// the pricing slide goes here\n---\n## Two\n")
+    assert [s.first("h2") for s in d.slides] == [Block("h2", text="One"), Block("h2", text="Two")]
+
+
+def test_split_without_an_image_parses():
+    d = deck("---\nlayout: split\nimage-wide: yes\n\n## Diagram to come\n- a point\n")
+    assert "image" not in d.slides[0].meta
+
+
+def test_image_layout_takes_image_keys_and_no_content():
+    d = deck("---\nlayout: image\nkicker: K\nimage: x.png\nimage-alt: A\nimage-max: 800\n")
+    assert d.slides[0].layout == "image"
+    assert d.slides[0].blocks == ()
+    assert deck("---\nlayout: image\n").slides[0].meta == {"layout": "image"}
+
+
+@pytest.mark.parametrize(
+    ("source", "message"),
+    [
+        (
+            "---\nlayout: image\n\n## A\n",
+            "a ## heading isn't used by the image layout, which takes no content",
+        ),
+        ("---\nlayout: image\nimage-wide: yes\n", "'image-wide' only applies to the split layout"),
+        ("---\nimage: x.png\n\n## A\n", "'image' only applies to the split and image layouts"),
+    ],
+)
+def test_image_layout_errors(source: str, message: str):
+    with pytest.raises(DeckError) as e:
+        parse(source, Path("deck.md"))
+    assert message in str(e.value)
+
+
+def test_image_frame_comes_from_the_slide_then_the_deck():
+    d = deck("""
+        image-frame: no
+        ---
+        layout: image
+        ---
+        layout: split
+        image-frame: yes
+
+        ## A
+    """)
+    assert [d.framed(s) for s in d.slides] == [False, True]
+    assert deck("---\nlayout: image\n").framed(deck("---\nlayout: image\n").slides[0])
+
+
+@pytest.mark.parametrize(
+    ("source", "message"),
+    [
+        ("image-frame: off\n---\n## A\n", "deck.md:1: 'image-frame' must be yes or no, not 'off'"),
+        ("---\nlayout: image\nimage-frame: 0\n", "'image-frame' must be yes or no, not '0'"),
+        ("---\nimage-frame: no\n\n## A\n", "'image-frame' only applies to the split and image layouts"),
+    ],
+)
+def test_image_frame_errors(source: str, message: str):
+    with pytest.raises(DeckError) as e:
+        parse(source, Path("deck.md"))
+    assert message in str(e.value)

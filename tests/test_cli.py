@@ -15,13 +15,14 @@ EXTERNAL_REF = re.compile(r"""(src|href)=["']?(https?:|//|\.{0,2}/)|<link|@impor
 def test_builds_the_demo_deck_self_contained(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     out = tmp_path / "demo.html"
     assert main(["build", str(DEMO / "deck.md"), "-o", str(out)]) == 0
-    assert re.fullmatch(rf"wrote {re.escape(str(out))} \(\d+ KB, 7 slides\)\n", capsys.readouterr().out)
+    assert re.fullmatch(rf"wrote {re.escape(str(out))} \(\d+ KB, 8 slides\)\n", capsys.readouterr().out)
 
     page = out.read_text()
-    assert page.count('<section class="slide') == 7
+    assert page.count('<section class="slide') == 8
     assert "__SLIDES__" not in page
     assert "data:image/svg+xml;base64," in page
     assert not EXTERNAL_REF.search(page)
+    assert "Author note" not in page
 
 
 def test_default_output_sits_next_to_the_deck(tmp_path: Path):
@@ -48,6 +49,18 @@ def test_deck_paths_resolve_against_the_deck_folder(tmp_path: Path, monkeypatch:
     page = (tmp_path / "talk" / "deck.html").read_text()
     assert "data:image/png;base64," in page
     assert "--bg: #f7f5f0;" in page
+
+
+def test_image_frame_setting_reaches_the_page(tmp_path: Path):
+    Image.new("RGB", (20, 20)).save(tmp_path / "fig.png")
+    (tmp_path / "deck.md").write_text(
+        "image-frame: no\n---\nlayout: image\nimage: fig.png\n"
+        "---\nlayout: image\nimage-frame: yes\nimage: fig.png\n"
+    )
+    assert main(["build", str(tmp_path / "deck.md")]) == 0
+    page = (tmp_path / "deck.html").read_text()
+    assert page.count('<img class="bare" src="data:image/png') == 1
+    assert page.count('<img src="data:image/png') == 1
 
 
 def test_errors_exit_1_with_a_message(tmp_path: Path, capsys: pytest.CaptureFixture[str]):

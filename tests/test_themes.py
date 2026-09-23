@@ -63,3 +63,20 @@ def test_missing_tokens_are_listed(tmp_path: Path):
     (tmp_path / "partial.css").write_text(partial)
     with pytest.raises(DeckError, match=r"doesn't set: --bg, --mono$"):
         themes.load("partial.css", tmp_path)
+
+
+def test_values_reads_each_token_and_a_later_setting_wins():
+    css = ':root { --bg: #000; --font: "Inter", sans-serif; }\n.x { --bg: #fff }\n'
+    assert themes.values(css) == {"bg": "#fff", "font": '"Inter", sans-serif'}
+
+
+def test_values_ignore_tokens_inside_comments():
+    css = ":root { --bg: #000; /* --bg: page background */\n  --line: #234; }"
+    assert themes.values(css) == {"bg": "#000", "line": "#234"}
+
+
+def test_a_token_set_only_in_a_comment_is_missing(tmp_path: Path):
+    css = FULL.replace("  --accent: x;\n", "  /* --accent: x; */\n")
+    (tmp_path / "t.css").write_text(css)
+    with pytest.raises(DeckError, match="doesn't set: --accent$"):
+        themes.load("t.css", tmp_path)

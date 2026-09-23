@@ -3,7 +3,8 @@
 Build self-contained HTML slide decks from Markdown.
 
 You write slides in one Markdown file and run one command. You get a single HTML file with every
-image embedded in it. Large PNG, JPEG and WebP images are shrunk first. The file has no external
+image embedded in it. Large PNG, JPEG and WebP images are shrunk first, and Mermaid `.mmd`
+diagrams are drawn to SVG if you have the Mermaid CLI installed. The file has no external
 assets, so it opens straight from disk, works offline, and survives being emailed or copied
 anywhere.
 
@@ -67,6 +68,9 @@ Open `deck.html` in a browser to present:
 
 A click while text is selected doesn't change slides, so you can copy text from a slide.
 
+The address bar shows the current slide as `#N`, so `deck.html#4` opens on slide 4 and a reload
+stays on the slide you were on.
+
 `examples/demo/deck.md` uses every layout and markup feature. Build it with
 `akceo build examples/demo/deck.md`.
 
@@ -79,6 +83,7 @@ A click while text is selected doesn't change slides, so you can copy text from 
 | `split` | A diagram with commentary | image, `##` heading, phases, lists, note |
 | `steps` | A sequence | `##` heading, paragraph, numbered list |
 | `table` | Comparisons | `##` heading, table |
+| `image` | A diagram on its own | image, kicker |
 
 The full format is in [docs/syntax.md](docs/syntax.md). It covers config keys, slide keys, blocks
 and inline markup.

@@ -43,7 +43,7 @@ flowchart LR
 **Who it's for:** people who present often and would rather write than lay out slides. Think
 engineers, founders, and anyone giving a design review or a pitch.
 
-**What it isn't:** a drawing tool. Akceo has five fixed layouts, and that restraint is the point.
+**What it isn't:** a drawing tool. Akceo has six fixed layouts, and that restraint is the point.
 If a slide needs free-form design, make that one image in another tool and drop it into a
 `split` slide.
 
@@ -97,7 +97,8 @@ kicker: The problem
 - CI queues back up at ==peak hours==.
 ```
 
-There are five layouts: `title`, `bullets`, `split` (image beside text), `steps` and `table`.
+There are six layouts: `title`, `bullets`, `split` (image beside text), `steps`, `table` and
+`image` (an image on its own).
 The inline marks are small: bold, a strong color, an accent color, dimmed asides and code.
 
 ### Building
@@ -146,6 +147,9 @@ Open `deck.html` in a browser.
 A thin progress bar runs along the bottom, with a slide counter in the corner. Selecting text
 doesn't change slides, so you can copy from a slide mid-talk.
 
+The address bar shows the current slide as `#N`. A link to `deck.html#4` opens slide 4, and a
+reload after a rebuild brings you back to the slide you were on.
+
 ### Presenting with private notes
 
 Your notes live in a Markdown file. You read them in `md-viewer.html`, a small page that
@@ -179,7 +183,8 @@ sequenceDiagram
 - **Self-contained output.** The built page references no external file or URL. CSS,
   JavaScript and images are all inside it.
 - **One runtime dependency.** Pillow, for shrinking images. Everything else is the Python
-  standard library, and the page uses plain JavaScript with no framework.
+  standard library, and the page uses plain JavaScript with no framework. The Mermaid CLI
+  (`mmdc`) is an optional outside tool, needed only for decks that use `.mmd` diagrams.
 - **Fail loudly and precisely.** Input is checked before anything is written. Every error names
   the file it's about, and errors in the deck also give the line and slide.
 - **Content and look are separate.** The deck says what's on each slide; the theme alone decides
@@ -209,8 +214,8 @@ flowchart TD
 | `cli.py` | Parses arguments, runs a command, writes the output, turns `DeckError` into a message and exit code 1 |
 | `render.py` | Runs the build: loads the deck and theme, embeds images, renders each slide, fills the page template |
 | `parse.py` | Turns Markdown into a validated `Deck`. All input rules live here. |
-| `themes.py` | Finds a theme by name or path and checks that it sets every token |
-| `images.py` | Turns an image file into a `data:` URI, shrinking raster images |
+| `themes.py` | Finds a theme by name or path, checks that it sets every token, and reads the token values that Mermaid diagrams use |
+| `images.py` | Turns an image file into a `data:` URI, shrinking raster images and drawing Mermaid diagrams with `mmdc` |
 | `files.py` | Reads user files, turning read and decode failures into `DeckError` |
 | `errors.py` | `DeckError`, the one exception type the CLI reports to the user |
 
@@ -228,10 +233,11 @@ sequenceDiagram
     P-->>R: Deck (config + slides)
     R->>T: theme from --theme, else the deck's theme:, else midnight
     T-->>R: theme CSS
-    loop each split slide
-        R->>I: image path, image-max
+    loop each split or image slide with an image: line
+        R->>I: image path, image-max, theme colors if the image has no frame
         I-->>R: data URI
     end
+    Note over R: a slide with no image: line gets a dashed placeholder instead
     R->>R: render slides, fill page.html
     R-->>CLI: HTML, slide count
     CLI->>CLI: write deck.html, print summary
@@ -248,7 +254,7 @@ flowchart LR
     chunks --> slides["Each other chunk:<br/>a slide"]
     slides --> header["Header lines<br/>key: value"]
     slides --> body["Body lines"]
-    body --> logical["Join continuations<br/>(2-space indent, trailing \)"]
+    body --> logical["Drop // notes, then join continuations<br/>(2-space indent, trailing \)"]
     logical --> blocks["Group into blocks<br/>h1 h2 phase ul ol lead table note para"]
     header --> check{"Validate against<br/>the layout's contract"}
     blocks --> check
@@ -260,7 +266,7 @@ Each layout has a contract, set in data at the top of `parse.py`:
 
 - the header keys it accepts (`LAYOUT_KEYS`)
 - the blocks it renders, and whether each may repeat (`LAYOUT_BLOCKS`)
-- what it requires (`REQUIRED_KEYS`, `REQUIRED_BLOCKS`)
+- the blocks it requires (`REQUIRED_BLOCKS`)
 
 Anything outside the contract is an error rather than something silently dropped.
 
@@ -330,15 +336,19 @@ is in [syntax.md](syntax.md#themes).
 
 ```mermaid
 flowchart TD
-    start["image: file on a split slide"] --> exists{"File exists?"}
+    start["image: file on a split or image slide"] --> exists{"File exists?"}
     exists -->|no| e1["DeckError: image not found"]
-    exists -->|yes| svg{"SVG?"}
+    exists -->|yes| mmd{".mmd?"}
+    mmd -->|yes| mmdc["Run mmdc to draw SVG, in the theme's<br/>colors if unframed, then give it a pixel size"]
+    mmdc -->|"no mmdc, or a<br/>Mermaid error"| e3["DeckError"]
+    mmd -->|no| svg{"SVG?"}
     svg -->|yes| raw["Embed the bytes unchanged"]
     svg -->|no| fmt{"PNG, JPEG or WebP?"}
     fmt -->|no| e2["DeckError: unsupported format"]
     fmt -->|yes| fix["Rotate upright from EXIF,<br/>shrink to image-max,<br/>never enlarge"]
     fix --> save["Re-save in the same format<br/>(JPEG and WebP at quality 90)"]
     raw --> uri["base64 data: URI in the img src"]
+    mmdc --> uri
     save --> uri
 ```
 
@@ -361,7 +371,9 @@ Anything else is a bug in Akceo, and it shows a normal Python traceback.
 
 `deck.js` is small. It shows one slide at a time by toggling an `active` class,
 moves the progress bar and counter, and maps keys and clicks to next and previous. A click is
-ignored while text is selected.
+ignored while text is selected. On load it opens the slide named in the URL hash. On each move
+it writes the new number back with `history.replaceState`, so stepping through slides doesn't
+fill the browser history. A hash typed into the address bar moves to that slide.
 
 ### The notes viewer
 

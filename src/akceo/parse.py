@@ -7,20 +7,20 @@ from pathlib import Path
 from akceo import files
 from akceo.errors import DeckError
 
-LAYOUTS = ("title", "bullets", "split", "steps", "table")
+LAYOUTS = ("title", "bullets", "split", "steps", "table", "image")
 DEFAULT_LAYOUT = "bullets"
-CONFIG_KEYS = ("title", "theme", "images")
+CONFIG_KEYS = ("title", "theme", "images", "image-frame")
 STYLE_KEYS = ("style-h1", "style-h2", "style-lead", "style-ul", "style-ol", "style-sub")
 COMMON_KEYS = ("layout", "kicker", *STYLE_KEYS)
 LAYOUT_KEYS: dict[str, tuple[str, ...]] = {
     "title": ("meta",),
     "bullets": (),
-    "split": ("image", "image-alt", "image-max", "image-wide"),
+    "split": ("image", "image-alt", "image-max", "image-wide", "image-frame"),
     "steps": (),
     "table": ("dim-last-column",),
+    "image": ("image", "image-alt", "image-max", "image-frame"),
 }
-REQUIRED_KEYS: dict[str, tuple[str, ...]] = {"split": ("image",)}
-FLAG_KEYS = ("image-wide", "dim-last-column")
+FLAG_KEYS = ("image-wide", "dim-last-column", "image-frame")
 
 # Block kinds each layout renders, mapped to whether that kind may appear more than once.
 LAYOUT_BLOCKS: dict[str, dict[str, bool]] = {
@@ -29,6 +29,7 @@ LAYOUT_BLOCKS: dict[str, dict[str, bool]] = {
     "split": {"h2": False, "phase": True, "ul": True, "note": False},
     "steps": {"h2": False, "para": False, "ol": False},
     "table": {"h2": False, "table": False},
+    "image": {},
 }
 REQUIRED_BLOCKS: dict[str, tuple[str, ...]] = {
     "title": ("h1",),
@@ -36,6 +37,7 @@ REQUIRED_BLOCKS: dict[str, tuple[str, ...]] = {
     "split": ("h2",),
     "steps": ("h2", "ol"),
     "table": ("h2", "table"),
+    "image": (),
 }
 BLOCK_NAMES = {
     "h1": "a # heading",
@@ -98,6 +100,10 @@ class Deck:
     def title(self) -> str:
         return self.config.get("title", self.path.stem)
 
+    def framed(self, slide: Slide) -> bool:
+        """Whether the slide's image sits in a panel. The slide's image-frame wins over the deck's."""
+        return slide.meta.get("image-frame", self.config.get("image-frame", "yes")) == "yes"
+
     def error(self, slide: Slide, message: str) -> DeckError:
         return _error(self.path, slide.line, f"slide {slide.number}: {message}")
 
@@ -119,15 +125,17 @@ def parse(text: str, path: Path) -> Deck:
             raise _error(
                 path, line, f"unknown config key '{key}' (expected one of: {', '.join(CONFIG_KEYS)})"
             )
+        if key in FLAG_KEYS and value not in ("yes", "no"):
+            raise _error(path, line, f"'{key}' must be yes or no, not '{value}'")
         config[key] = value
-    if any(line.strip() for line in rest):
+    if any(_has_content(line) for line in rest):
         raise _error(
             path, config_start, "the config block may only hold key: value lines; start each slide after ---"
         )
 
     slides: list[Slide] = []
     for start, lines in chunks[1:]:
-        if any(line.strip() for line in lines):
+        if any(_has_content(line) for line in lines):
             slides.append(_slide(path, len(slides) + 1, start, lines))
     if not slides:
         raise DeckError(f"{path}: the deck has no slides; start each slide after a --- line")
@@ -149,16 +157,26 @@ def _chunks(text: str) -> list[tuple[int, list[str]]]:
     return chunks
 
 
+def _is_author_note(line: str) -> bool:
+    """A `//` line is for the deck's author. The parser drops it wherever it appears."""
+    return line.lstrip().startswith("//")
+
+
+def _has_content(line: str) -> bool:
+    return bool(line.strip()) and not _is_author_note(line)
+
+
 def _split_header(start: int, lines: list[str]) -> tuple[list[Entry], list[str], int]:
-    """Peel the leading `key: value` lines off a chunk. Returns the entries, the body lines, and the
-    line number of the chunk's first non-blank line."""
+    """Peel the leading `key: value` lines off a chunk, skipping author notes among them. Returns the
+    entries, the body lines, and the line number of the chunk's first line with content."""
     i = 0
-    while i < len(lines) and not lines[i].strip():
+    while i < len(lines) and not _has_content(lines[i]):
         i += 1
     first = start + i
     entries: list[Entry] = []
-    while i < len(lines) and (m := HEADER.match(lines[i])):
-        entries.append((start + i, m.group(1), m.group(2).strip()))
+    while i < len(lines) and ((m := HEADER.match(lines[i])) or _is_author_note(lines[i])):
+        if m:
+            entries.append((start + i, m.group(1), m.group(2).strip()))
         i += 1
     return entries, lines[i:], first
 
@@ -175,20 +193,18 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
         raise fail(f"unknown layout '{layout}' (expected one of: {', '.join(LAYOUTS)})")
 
     for line, key, value in entries:
-        owner = next((name for name, keys in LAYOUT_KEYS.items() if key in keys), None)
-        if key not in COMMON_KEYS and owner is None:
+        owners = [name for name, keys in LAYOUT_KEYS.items() if key in keys]
+        if key not in COMMON_KEYS and not owners:
             raise fail(f"unknown key '{key}'", line)
-        if owner is not None and owner != layout:
-            raise fail(f"'{key}' only applies to the {owner} layout", line)
+        if owners and layout not in owners:
+            noun = "layout" if len(owners) == 1 else "layouts"
+            raise fail(f"'{key}' only applies to the {_join(owners)} {noun}", line)
         if key in FLAG_KEYS and value not in ("yes", "no"):
             raise fail(f"'{key}' must be yes or no, not '{value}'", line)
         if key == "image-max" and not (value.isdigit() and int(value) > 0):
             raise fail(f"'image-max' must be a positive whole number of pixels, not '{value}'", line)
         if key in STYLE_KEYS and STYLE_URL.search(value):
             raise fail(f"'{key}' can't reference files or URLs (url() or image-set())", line)
-    for key in REQUIRED_KEYS.get(layout, ()):
-        if key not in meta:
-            raise fail(f"the {layout} layout needs an '{key}:' line")
 
     blocks = _blocks(_logical_lines(body))
     allowed = LAYOUT_BLOCKS[layout]
@@ -196,7 +212,8 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
     for block in blocks:
         name = BLOCK_NAMES[block.kind]
         if block.kind not in allowed:
-            raise fail(f"{name} isn't used by the {layout} layout")
+            takes = _join([BLOCK_NAMES[kind] for kind in allowed]) if allowed else "no content"
+            raise fail(f"{name} isn't used by the {layout} layout, which takes {takes}")
         if block.kind in seen and not allowed[block.kind]:
             raise fail(f"the {layout} layout takes only one {name.split(' ', 1)[1]}")
         seen.add(block.kind)
@@ -207,12 +224,20 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
     return Slide(number, first, meta, tuple(blocks))
 
 
+def _join(names: list[str]) -> str:
+    """Join names as prose: "a", "a and b", "a, b and c"."""
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+
+
 def _logical_lines(lines: list[str]) -> list[str]:
     """Fold continuations into one line each: a trailing backslash joins the next line as a hard break,
-    a two-space indent joins it as flowing text."""
+    a two-space indent joins it as flowing text. Author notes are dropped first, so they never join
+    or split anything."""
     out: list[str] = []
     for line in lines:
         stripped = line.rstrip()
+        if _is_author_note(line):
+            continue
         if not stripped.strip():
             out.append("")
         elif out and out[-1].endswith("\\"):

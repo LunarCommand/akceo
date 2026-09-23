@@ -15,6 +15,7 @@ kicker: Why
 
 ## Slides are structured text
 
+// Author note: lines that start with // never reach the page.
 - Write in **Markdown**, keep the deck in git, and review it in a diff.
 - Build to a **single HTML file** with images embedded and no external assets.
 - Open it anywhere: a browser, offline, or from an email attachment.
@@ -78,7 +79,7 @@ layout: table
 kicker: Reference
 dim-last-column: yes
 
-## Five layouts
+## Six layouts
 
 | Layout | Best for | Content |
 | --- | --- | --- |
@@ -87,6 +88,14 @@ dim-last-column: yes
 | **split** | A diagram with commentary | image, `##` heading, phases, lists, note |
 | **steps** | A sequence | `##` heading, paragraph, numbered list |
 | **table** | Comparisons | `##` heading, table |
+| **image** | A diagram on its own | image, kicker |
+
+---
+
+layout: image
+kicker: The image layout
+image: flow.svg
+image-alt: deck.md and a theme go into akceo build, which writes deck.html
 
 ---
 

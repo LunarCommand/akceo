@@ -102,6 +102,19 @@ def test_split_slide_renders_blocks_in_order_and_note_last():
     assert phase < item < note
 
 
+def test_split_slide_puts_kicker_in_the_text_column():
+    html = slide_html("layout: split\nimage: x.png\nkicker: K\n\n## A\n")
+    assert html.count('<div class="kicker">K</div>') == 1
+    assert '<div>\n        <div class="kicker">K</div>\n        <h2>A</h2>' in html
+
+
+def test_split_slide_without_an_image_shows_a_placeholder():
+    html = slide_html("layout: split\nimage-wide: yes\n\n## A\n")
+    assert '<div class="split img-wide">' in html
+    assert '<div class="figwrap"><div class="placeholder"></div></div>' in html
+    assert "<img" not in html
+
+
 def test_phase_without_description_has_no_empty_paragraph():
     html = slide_html("layout: split\nimage: x.png\n\n## A\n### solo\n")
     assert '<div class="phase"><h3>solo</h3></div>' in html
@@ -140,3 +153,28 @@ def test_table_slide_dims_last_column_only_when_asked():
 def test_style_values_are_attribute_escaped():
     html = slide_html('style-h2: font-family:"Serif"\n\n## H\n')
     assert '<h2 style="font-family:&quot;Serif&quot;">H</h2>' in html
+
+
+def test_image_slide_keeps_the_kicker_at_the_top():
+    html = slide_html('layout: image\nkicker: K\nimage: x.png\nimage-alt: A "b"\n', image_src="data:x")
+    assert html == "\n".join(
+        [
+            '  <section class="slide">',
+            '    <div class="kicker">K</div>',
+            '    <div class="figure-full"><img src="data:x" alt="A &quot;b&quot;"></div>',
+            "  </section>",
+        ]
+    )
+
+
+def test_image_slide_without_an_image_shows_a_placeholder():
+    html = slide_html("layout: image\n")
+    assert '<div class="figure-full"><div class="placeholder"></div></div>' in html
+
+
+def test_an_unframed_image_is_bare_and_a_placeholder_is_unchanged():
+    html = render_slide(
+        parse("---\nlayout: image\nimage: x.png\n", Path("deck.md")).slides[0], "data:x", False
+    )
+    assert '<img class="bare" src="data:x" alt="">' in html
+    assert "bare" not in render_slide(parse("---\nlayout: image\n", Path("deck.md")).slides[0], "", False)
