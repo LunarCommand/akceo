@@ -260,7 +260,7 @@ Each layout has a contract, set in data at the top of `parse.py`:
 
 - the header keys it accepts (`LAYOUT_KEYS`)
 - the blocks it renders, and whether each may repeat (`LAYOUT_BLOCKS`)
-- what it requires (`REQUIRED_KEYS`, `REQUIRED_BLOCKS`)
+- the blocks it requires (`REQUIRED_BLOCKS`)
 
 Anything outside the contract is an error rather than something silently dropped.
 

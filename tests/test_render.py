@@ -102,6 +102,13 @@ def test_split_slide_renders_blocks_in_order_and_note_last():
     assert phase < item < note
 
 
+def test_split_slide_without_an_image_shows_a_placeholder():
+    html = slide_html("layout: split\nimage-wide: yes\n\n## A\n")
+    assert '<div class="split img-wide">' in html
+    assert '<div class="figwrap"><div class="placeholder"></div></div>' in html
+    assert "<img" not in html
+
+
 def test_phase_without_description_has_no_empty_paragraph():
     html = slide_html("layout: split\nimage: x.png\n\n## A\n### solo\n")
     assert '<div class="phase"><h3>solo</h3></div>' in html

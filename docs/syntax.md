@@ -50,7 +50,7 @@ A slide starts with `key: value` header lines. Then comes a blank line, then the
 | `layout` | all | `title`, `bullets`, `split`, `steps` or `table`. Default `bullets`. |
 | `kicker` | all | Small uppercase label above the heading. |
 | `meta` | title | A line of text under the title. |
-| `image` | split | Image file, relative to the `images` folder. Required. |
+| `image` | split | Image file, relative to the `images` folder. Leave it out to show a dashed placeholder while the image doesn't exist yet. |
 | `image-alt` | split | Alt text for the image. |
 | `image-max` | split | Longest side in pixels after shrinking. Default `2400`. |
 | `image-wide` | split | `yes` gives the image the wider column. |
@@ -63,7 +63,7 @@ A slide starts with `key: value` header lines. Then comes a blank line, then the
 | --- | --- | --- | --- |
 | `title` | A centered title | `#` heading | `#` heading |
 | `bullets` | A heading and a list | `##` heading, `>` lead, `-` list, paragraph | `##` heading |
-| `split` | An image left, text right | `##` heading, any number of `###` phases and `-` lists, one `*note*` | `##` heading, `image:` |
+| `split` | An image left, text right | `##` heading, any number of `###` phases and `-` lists, one `*note*` | `##` heading |
 | `steps` | A numbered sequence | `##` heading, paragraph, `1.` list | `##` heading, `1.` list |
 | `table` | A table | `##` heading, `\|` table | `##` heading, `\|` table |
 
@@ -116,6 +116,10 @@ The `split` layout embeds its image in the page.
 
 Other formats stop the build.
 
+A `split` slide with no `image:` line shows a dashed box where the image will go, so you can
+set up the slide before the image exists. An `image:` that names a missing file still stops the
+build.
+
 ## Themes
 
 A theme is a CSS file. akceo adds it after its own layout rules, so a theme sets the tokens below
@@ -125,7 +129,7 @@ the message lists the missing ones.
 | Token | Used for |
 | --- | --- |
 | `--bg` | Page background, and the numbers in `steps` |
-| `--line` | Table rules and the key hint |
+| `--line` | Table rules, the key hint, and the border of a `split` image placeholder |
 | `--text` | Body text |
 | `--muted` | Paragraphs, notes, the meta line, `((dimmed))` text |
 | `--strong` | Bold text in lists and the first table column, phase names, `***strong***` |

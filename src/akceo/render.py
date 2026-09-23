@@ -126,7 +126,13 @@ def render_slide(slide: Slide, image_src: str = "") -> str:
         wide = " img-wide" if slide.flag("image-wide") else ""
         alt = html.escape(slide.meta.get("image-alt", ""))
         out.append(f'    <div class="split{wide}">')
-        out.append(f'      <div class="figwrap"><img src="{image_src}" alt="{alt}"></div>')
+        # With no image: line yet, a dashed box holds the image's place.
+        figure = (
+            f'<img src="{image_src}" alt="{alt}">'
+            if "image" in slide.meta
+            else '<div class="placeholder"></div>'
+        )
+        out.append(f'      <div class="figwrap">{figure}</div>')
         out.append("      <div>")
         out.append(f"        {h2}")
         for block in slide.blocks:

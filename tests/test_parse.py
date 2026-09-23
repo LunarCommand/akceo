@@ -190,7 +190,6 @@ def test_paragraph_starting_like_a_block_marker_terminates():
             "---\nlayout: split\nimage: x.png\nimage-max: big\n\n## A\n",
             "'image-max' must be a positive whole",
         ),
-        ("---\nlayout: split\n\n## A\n", "slide 1: the split layout needs an 'image:' line"),
         (
             "---\nkicker: K\nstyle-h2: background:URL (https://x.test/a.png)\n\n## A\n",
             "deck.md:3: slide 1: 'style-h2' can't reference files or URLs",
@@ -233,3 +232,8 @@ def test_split_allows_repeated_phases_and_lists():
         body 2
     """)
     assert [b.kind for b in d.slides[0].blocks] == ["h2", "ul", "phase", "ul", "phase"]
+
+
+def test_split_without_an_image_parses():
+    d = deck("---\nlayout: split\nimage-wide: yes\n\n## Diagram to come\n- a point\n")
+    assert "image" not in d.slides[0].meta
