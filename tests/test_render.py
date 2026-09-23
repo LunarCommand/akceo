@@ -108,6 +108,13 @@ def test_split_slide_puts_kicker_in_the_text_column():
     assert '<div>\n        <div class="kicker">K</div>\n        <h2>A</h2>' in html
 
 
+def test_split_slide_without_an_image_shows_a_placeholder():
+    html = slide_html("layout: split\nimage-wide: yes\n\n## A\n")
+    assert '<div class="split img-wide">' in html
+    assert '<div class="figwrap"><div class="placeholder"></div></div>' in html
+    assert "<img" not in html
+
+
 def test_phase_without_description_has_no_empty_paragraph():
     html = slide_html("layout: split\nimage: x.png\n\n## A\n### solo\n")
     assert '<div class="phase"><h3>solo</h3></div>' in html

@@ -17,6 +17,8 @@ All notable changes to this project are documented here. The format follows
 - The URL hash tracks the current slide: `deck.html#4` opens slide 4, and a reload stays put.
 - Author notes: a line starting with `//` is dropped from the page, so reminders can sit next to
   the slide they're about.
+- A `split` slide with no `image:` line builds with a dashed placeholder box, so a slide can be
+  set up before its image exists.
 - `akceo viewer` writes `md-viewer.html`, a speaker-notes viewer for a second browser tab. In
   Chrome and Edge it refreshes live when the notes file changes.
 - Example speaker notes for the demo deck.

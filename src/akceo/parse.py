@@ -19,7 +19,6 @@ LAYOUT_KEYS: dict[str, tuple[str, ...]] = {
     "steps": (),
     "table": ("dim-last-column",),
 }
-REQUIRED_KEYS: dict[str, tuple[str, ...]] = {"split": ("image",)}
 FLAG_KEYS = ("image-wide", "dim-last-column")
 
 # Block kinds each layout renders, mapped to whether that kind may appear more than once.
@@ -196,9 +195,6 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
             raise fail(f"'image-max' must be a positive whole number of pixels, not '{value}'", line)
         if key in STYLE_KEYS and STYLE_URL.search(value):
             raise fail(f"'{key}' can't reference files or URLs (url() or image-set())", line)
-    for key in REQUIRED_KEYS.get(layout, ()):
-        if key not in meta:
-            raise fail(f"the {layout} layout needs an '{key}:' line")
 
     blocks = _blocks(_logical_lines(body))
     allowed = LAYOUT_BLOCKS[layout]
