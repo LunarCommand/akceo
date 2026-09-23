@@ -153,3 +153,20 @@ def test_table_slide_dims_last_column_only_when_asked():
 def test_style_values_are_attribute_escaped():
     html = slide_html('style-h2: font-family:"Serif"\n\n## H\n')
     assert '<h2 style="font-family:&quot;Serif&quot;">H</h2>' in html
+
+
+def test_image_slide_keeps_the_kicker_at_the_top():
+    html = slide_html('layout: image\nkicker: K\nimage: x.png\nimage-alt: A "b"\n', image_src="data:x")
+    assert html == "\n".join(
+        [
+            '  <section class="slide">',
+            '    <div class="kicker">K</div>',
+            '    <div class="figure-full"><img src="data:x" alt="A &quot;b&quot;"></div>',
+            "  </section>",
+        ]
+    )
+
+
+def test_image_slide_without_an_image_shows_a_placeholder():
+    html = slide_html("layout: image\n")
+    assert '<div class="figure-full"><div class="placeholder"></div></div>' in html

@@ -30,12 +30,15 @@ The three phases on the right are the whole workflow. Mention that images are sh
 ### 5 · From zero to a deck *(0:30)*
 Read the four steps as a loop, not a one-time setup. After the first install it's write, build, present.
 
-### 6 · Five layouts *(0:30)*
-There are only five layouts, on purpose. Most slides are `bullets`; `split` is for a diagram with commentary.
+### 6 · Six layouts *(0:30)*
+There are only six layouts, on purpose. Most slides are `bullets`; `split` is for a diagram with commentary, and `image` is for a diagram on its own.
 
 > The muted last column is `dim-last-column: yes` on this slide.
 
-### 7 · Same deck, any look *(0:20)*
+### 7 · The image layout *(0:15)*
+The same diagram, now on its own. The image fills the slide and the kicker stays in the corner. Leave out `image:` and the slide shows a dashed placeholder until the diagram exists.
+
+### 8 · Same deck, any look *(0:20)*
 Close by rebuilding with `--theme paper` live, if time allows. The content doesn't change, only the look.
 
 ---

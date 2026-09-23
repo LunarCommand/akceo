@@ -106,6 +106,13 @@ def _list(tag: str, items: tuple[str, ...], indent: str, attrs: str = "") -> lis
     ]
 
 
+def _figure(slide: Slide, image_src: str) -> str:
+    """The slide's image, or a dashed box holding its place while there's no image: line yet."""
+    if "image" not in slide.meta:
+        return '<div class="placeholder"></div>'
+    return f'<img src="{image_src}" alt="{html.escape(slide.meta.get("image-alt", ""))}">'
+
+
 def render_slide(slide: Slide, image_src: str = "") -> str:
     kicker = slide.meta.get("kicker")
     kicker_html = [f'    <div class="kicker">{inline(kicker)}</div>'] if kicker else []
@@ -123,17 +130,13 @@ def render_slide(slide: Slide, image_src: str = "") -> str:
     out = ['  <section class="slide">', *(kicker_html if slide.layout != "split" else [])]
     h2 = f"<h2{_style(slide, 'h2')}>{inline(_text(slide, 'h2'))}</h2>"
 
-    if slide.layout == "split":
+    if slide.layout == "image":
+        out.append(f'    <div class="figure-full">{_figure(slide, image_src)}</div>')
+
+    elif slide.layout == "split":
         wide = " img-wide" if slide.flag("image-wide") else ""
-        alt = html.escape(slide.meta.get("image-alt", ""))
         out.append(f'    <div class="split{wide}">')
-        # With no image: line yet, a dashed box holds the image's place.
-        figure = (
-            f'<img src="{image_src}" alt="{alt}">'
-            if "image" in slide.meta
-            else '<div class="placeholder"></div>'
-        )
-        out.append(f'      <div class="figwrap">{figure}</div>')
+        out.append(f'      <div class="figwrap">{_figure(slide, image_src)}</div>')
         out.append("      <div>")
         out.extend("    " + line for line in kicker_html)
         out.append(f"        {h2}")

@@ -43,7 +43,7 @@ flowchart LR
 **Who it's for:** people who present often and would rather write than lay out slides. Think
 engineers, founders, and anyone giving a design review or a pitch.
 
-**What it isn't:** a drawing tool. Akceo has five fixed layouts, and that restraint is the point.
+**What it isn't:** a drawing tool. Akceo has six fixed layouts, and that restraint is the point.
 If a slide needs free-form design, make that one image in another tool and drop it into a
 `split` slide.
 
@@ -97,7 +97,8 @@ kicker: The problem
 - CI queues back up at ==peak hours==.
 ```
 
-There are five layouts: `title`, `bullets`, `split` (image beside text), `steps` and `table`.
+There are six layouts: `title`, `bullets`, `split` (image beside text), `steps`, `table` and
+`image` (an image on its own).
 The inline marks are small: bold, a strong color, an accent color, dimmed asides and code.
 
 ### Building

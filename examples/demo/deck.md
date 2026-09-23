@@ -79,7 +79,7 @@ layout: table
 kicker: Reference
 dim-last-column: yes
 
-## Five layouts
+## Six layouts
 
 | Layout | Best for | Content |
 | --- | --- | --- |
@@ -88,6 +88,14 @@ dim-last-column: yes
 | **split** | A diagram with commentary | image, `##` heading, phases, lists, note |
 | **steps** | A sequence | `##` heading, paragraph, numbered list |
 | **table** | Comparisons | `##` heading, table |
+| **image** | A diagram on its own | image, kicker |
+
+---
+
+layout: image
+kicker: The image layout
+image: flow.svg
+image-alt: deck.md and a theme go into akceo build, which writes deck.html
 
 ---
 

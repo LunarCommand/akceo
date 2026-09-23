@@ -292,3 +292,27 @@ def test_a_chunk_of_only_author_notes_is_not_a_slide():
 def test_split_without_an_image_parses():
     d = deck("---\nlayout: split\nimage-wide: yes\n\n## Diagram to come\n- a point\n")
     assert "image" not in d.slides[0].meta
+
+
+def test_image_layout_takes_image_keys_and_no_content():
+    d = deck("---\nlayout: image\nkicker: K\nimage: x.png\nimage-alt: A\nimage-max: 800\n")
+    assert d.slides[0].layout == "image"
+    assert d.slides[0].blocks == ()
+    assert deck("---\nlayout: image\n").slides[0].meta == {"layout": "image"}
+
+
+@pytest.mark.parametrize(
+    ("source", "message"),
+    [
+        (
+            "---\nlayout: image\n\n## A\n",
+            "a ## heading isn't used by the image layout, which takes no content",
+        ),
+        ("---\nlayout: image\nimage-wide: yes\n", "'image-wide' only applies to the split layout"),
+        ("---\nimage: x.png\n\n## A\n", "'image' only applies to the split and image layouts"),
+    ],
+)
+def test_image_layout_errors(source: str, message: str):
+    with pytest.raises(DeckError) as e:
+        parse(source, Path("deck.md"))
+    assert message in str(e.value)

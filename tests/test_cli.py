@@ -15,10 +15,10 @@ EXTERNAL_REF = re.compile(r"""(src|href)=["']?(https?:|//|\.{0,2}/)|<link|@impor
 def test_builds_the_demo_deck_self_contained(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     out = tmp_path / "demo.html"
     assert main(["build", str(DEMO / "deck.md"), "-o", str(out)]) == 0
-    assert re.fullmatch(rf"wrote {re.escape(str(out))} \(\d+ KB, 7 slides\)\n", capsys.readouterr().out)
+    assert re.fullmatch(rf"wrote {re.escape(str(out))} \(\d+ KB, 8 slides\)\n", capsys.readouterr().out)
 
     page = out.read_text()
-    assert page.count('<section class="slide') == 7
+    assert page.count('<section class="slide') == 8
     assert "__SLIDES__" not in page
     assert "data:image/svg+xml;base64," in page
     assert not EXTERNAL_REF.search(page)

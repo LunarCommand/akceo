@@ -36,7 +36,7 @@ akceo viewer -o examples/demo
 ```
 
 Open `examples/demo/deck.html` and `examples/demo/md-viewer.html` in two tabs. In the viewer,
-open `examples/demo/speaker-notes.md`. Its sections match the demo's seven slides.
+open `examples/demo/speaker-notes.md`. Its sections match the demo's eight slides.
 
 ## Sharing in a meeting
 

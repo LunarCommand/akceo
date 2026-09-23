@@ -47,12 +47,12 @@ A slide starts with `key: value` header lines. Then comes a blank line, then the
 
 | Key | Layouts | Meaning |
 | --- | --- | --- |
-| `layout` | all | `title`, `bullets`, `split`, `steps` or `table`. Default `bullets`. |
+| `layout` | all | `title`, `bullets`, `split`, `steps`, `table` or `image`. Default `bullets`. |
 | `kicker` | all | Small uppercase label above the heading. |
 | `meta` | title | A line of text under the title. |
-| `image` | split | Image file, relative to the `images` folder. Leave it out to show a dashed placeholder while the image doesn't exist yet. |
-| `image-alt` | split | Alt text for the image. |
-| `image-max` | split | Longest side in pixels after shrinking. Default `2400`. |
+| `image` | split, image | Image file, relative to the `images` folder. Leave it out to show a dashed placeholder while the image doesn't exist yet. |
+| `image-alt` | split, image | Alt text for the image. |
+| `image-max` | split, image | Longest side in pixels after shrinking. Default `2400`. |
 | `image-wide` | split | `yes` gives the image the wider column. |
 | `dim-last-column` | table | `yes` shows the last column in muted text. |
 | `style-h1`, `style-h2`, `style-lead`, `style-ul`, `style-ol`, `style-sub` | all | Inline CSS for that element, for one-off spacing fixes. `style-sub` applies to the paragraph. It can't reference files or URLs. |
@@ -66,6 +66,7 @@ A slide starts with `key: value` header lines. Then comes a blank line, then the
 | `split` | An image left, text right | `##` heading, any number of `###` phases and `-` lists, one `*note*` | `##` heading |
 | `steps` | A numbered sequence | `##` heading, paragraph, `1.` list | `##` heading, `1.` list |
 | `table` | A table | `##` heading, `\|` table | `##` heading, `\|` table |
+| `image` | An image filling the slide, the kicker top left | nothing | nothing |
 
 Each kind of content may appear once per slide. In the `split` layout, phases and lists may
 repeat and render in the order written. There, the note always renders last.
@@ -124,7 +125,7 @@ Characters like `<` and `&` are escaped, so raw HTML shows as text.
 
 ## Images
 
-The `split` layout embeds its image in the page.
+The `split` and `image` layouts embed their image in the page.
 
 - **PNG, JPEG and WebP** are shrunk so the longest side is at most `image-max`. Smaller images
   are never enlarged. JPEG and WebP are re-saved at quality 90 and turned upright using their
@@ -133,7 +134,7 @@ The `split` layout embeds its image in the page.
 
 Other formats stop the build.
 
-A `split` slide with no `image:` line shows a dashed box where the image will go, so you can
+A `split` or `image` slide with no `image:` line shows a dashed box where the image will go, so you can
 set up the slide before the image exists. An `image:` that names a missing file still stops the
 build.
 
@@ -146,14 +147,14 @@ the message lists the missing ones.
 | Token | Used for |
 | --- | --- |
 | `--bg` | Page background, and the numbers in `steps` |
-| `--line` | Table rules, the key hint, and the border of a `split` image placeholder |
+| `--line` | Table rules, the key hint, and the border of an image placeholder |
 | `--text` | Body text |
 | `--muted` | Paragraphs, notes, the meta line, `((dimmed))` text |
 | `--strong` | Bold text in lists and the first table column, phase names, `***strong***` |
 | `--accent` | Kickers, list markers, `==accent==`, table headers, the progress bar |
 | `--accent2` | Code |
-| `--figure-bg` | Background behind `split` images |
-| `--figure-shadow` | Shadow under `split` images (a `box-shadow` value) |
+| `--figure-bg` | Background behind `split` and `image` images |
+| `--figure-shadow` | Shadow under `split` and `image` images (a `box-shadow` value) |
 | `--font` | Body font stack |
 | `--mono` | Code font stack |
 

@@ -7,7 +7,7 @@ from pathlib import Path
 from akceo import files
 from akceo.errors import DeckError
 
-LAYOUTS = ("title", "bullets", "split", "steps", "table")
+LAYOUTS = ("title", "bullets", "split", "steps", "table", "image")
 DEFAULT_LAYOUT = "bullets"
 CONFIG_KEYS = ("title", "theme", "images")
 STYLE_KEYS = ("style-h1", "style-h2", "style-lead", "style-ul", "style-ol", "style-sub")
@@ -18,6 +18,7 @@ LAYOUT_KEYS: dict[str, tuple[str, ...]] = {
     "split": ("image", "image-alt", "image-max", "image-wide"),
     "steps": (),
     "table": ("dim-last-column",),
+    "image": ("image", "image-alt", "image-max"),
 }
 FLAG_KEYS = ("image-wide", "dim-last-column")
 
@@ -28,6 +29,7 @@ LAYOUT_BLOCKS: dict[str, dict[str, bool]] = {
     "split": {"h2": False, "phase": True, "ul": True, "note": False},
     "steps": {"h2": False, "para": False, "ol": False},
     "table": {"h2": False, "table": False},
+    "image": {},
 }
 REQUIRED_BLOCKS: dict[str, tuple[str, ...]] = {
     "title": ("h1",),
@@ -35,6 +37,7 @@ REQUIRED_BLOCKS: dict[str, tuple[str, ...]] = {
     "split": ("h2",),
     "steps": ("h2", "ol"),
     "table": ("h2", "table"),
+    "image": (),
 }
 BLOCK_NAMES = {
     "h1": "a # heading",
@@ -184,11 +187,12 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
         raise fail(f"unknown layout '{layout}' (expected one of: {', '.join(LAYOUTS)})")
 
     for line, key, value in entries:
-        owner = next((name for name, keys in LAYOUT_KEYS.items() if key in keys), None)
-        if key not in COMMON_KEYS and owner is None:
+        owners = [name for name, keys in LAYOUT_KEYS.items() if key in keys]
+        if key not in COMMON_KEYS and not owners:
             raise fail(f"unknown key '{key}'", line)
-        if owner is not None and owner != layout:
-            raise fail(f"'{key}' only applies to the {owner} layout", line)
+        if owners and layout not in owners:
+            noun = "layout" if len(owners) == 1 else "layouts"
+            raise fail(f"'{key}' only applies to the {_join(owners)} {noun}", line)
         if key in FLAG_KEYS and value not in ("yes", "no"):
             raise fail(f"'{key}' must be yes or no, not '{value}'", line)
         if key == "image-max" and not (value.isdigit() and int(value) > 0):
@@ -202,7 +206,7 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
     for block in blocks:
         name = BLOCK_NAMES[block.kind]
         if block.kind not in allowed:
-            takes = _join([BLOCK_NAMES[kind] for kind in allowed])
+            takes = _join([BLOCK_NAMES[kind] for kind in allowed]) if allowed else "no content"
             raise fail(f"{name} isn't used by the {layout} layout, which takes {takes}")
         if block.kind in seen and not allowed[block.kind]:
             raise fail(f"the {layout} layout takes only one {name.split(' ', 1)[1]}")
