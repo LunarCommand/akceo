@@ -199,7 +199,16 @@ def test_paragraph_starting_like_a_block_marker_terminates():
             '---\nstyle-lead: background-image:image-set("a.png" 1x)\n\n## A\n',
             "deck.md:2: slide 1: 'style-lead' can't reference files or URLs",
         ),
-        ("---\n## A\n\n| a | b |\n", "slide 1: a | table isn't used by the bullets layout"),
+        (
+            "---\n## A\n\n| a | b |\n",
+            "slide 1: a | table isn't used by the bullets layout, which takes a ## heading, "
+            "a > lead, a - list and a paragraph",
+        ),
+        (
+            "---\nlayout: table\n\n## A\n| a | b |\n\nClosing words.\n",
+            "a paragraph isn't used by the table layout, which takes a ## heading and a | table",
+        ),
+        ("---\nlayout: title\n\n## A\n", "isn't used by the title layout, which takes a # heading"),
         ("---\n## A\n\n- one\n\nMiddle.\n\n- two\n", "the bullets layout takes only one - list"),
         ("---\nlayout: steps\n\n## A\n\nNo list.\n", "the steps layout needs a 1. list"),
         ("---\n- no heading\n", "the bullets layout needs a ## heading"),

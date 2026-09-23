@@ -196,7 +196,8 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
     for block in blocks:
         name = BLOCK_NAMES[block.kind]
         if block.kind not in allowed:
-            raise fail(f"{name} isn't used by the {layout} layout")
+            takes = _join([BLOCK_NAMES[kind] for kind in allowed])
+            raise fail(f"{name} isn't used by the {layout} layout, which takes {takes}")
         if block.kind in seen and not allowed[block.kind]:
             raise fail(f"the {layout} layout takes only one {name.split(' ', 1)[1]}")
         seen.add(block.kind)
@@ -205,6 +206,11 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
             raise fail(f"the {layout} layout needs {BLOCK_NAMES[kind]}")
 
     return Slide(number, first, meta, tuple(blocks))
+
+
+def _join(names: list[str]) -> str:
+    """Join names as prose: "a", "a and b", "a, b and c"."""
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
 
 def _logical_lines(lines: list[str]) -> list[str]:
