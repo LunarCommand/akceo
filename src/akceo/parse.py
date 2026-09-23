@@ -120,14 +120,14 @@ def parse(text: str, path: Path) -> Deck:
                 path, line, f"unknown config key '{key}' (expected one of: {', '.join(CONFIG_KEYS)})"
             )
         config[key] = value
-    if any(line.strip() for line in rest):
+    if any(_has_content(line) for line in rest):
         raise _error(
             path, config_start, "the config block may only hold key: value lines; start each slide after ---"
         )
 
     slides: list[Slide] = []
     for start, lines in chunks[1:]:
-        if any(line.strip() for line in lines):
+        if any(_has_content(line) for line in lines):
             slides.append(_slide(path, len(slides) + 1, start, lines))
     if not slides:
         raise DeckError(f"{path}: the deck has no slides; start each slide after a --- line")
@@ -149,16 +149,26 @@ def _chunks(text: str) -> list[tuple[int, list[str]]]:
     return chunks
 
 
+def _is_author_note(line: str) -> bool:
+    """A `//` line is for the deck's author. The parser drops it wherever it appears."""
+    return line.lstrip().startswith("//")
+
+
+def _has_content(line: str) -> bool:
+    return bool(line.strip()) and not _is_author_note(line)
+
+
 def _split_header(start: int, lines: list[str]) -> tuple[list[Entry], list[str], int]:
-    """Peel the leading `key: value` lines off a chunk. Returns the entries, the body lines, and the
-    line number of the chunk's first non-blank line."""
+    """Peel the leading `key: value` lines off a chunk, skipping author notes among them. Returns the
+    entries, the body lines, and the line number of the chunk's first line with content."""
     i = 0
-    while i < len(lines) and not lines[i].strip():
+    while i < len(lines) and not _has_content(lines[i]):
         i += 1
     first = start + i
     entries: list[Entry] = []
-    while i < len(lines) and (m := HEADER.match(lines[i])):
-        entries.append((start + i, m.group(1), m.group(2).strip()))
+    while i < len(lines) and ((m := HEADER.match(lines[i])) or _is_author_note(lines[i])):
+        if m:
+            entries.append((start + i, m.group(1), m.group(2).strip()))
         i += 1
     return entries, lines[i:], first
 
@@ -215,10 +225,13 @@ def _join(names: list[str]) -> str:
 
 def _logical_lines(lines: list[str]) -> list[str]:
     """Fold continuations into one line each: a trailing backslash joins the next line as a hard break,
-    a two-space indent joins it as flowing text."""
+    a two-space indent joins it as flowing text. Author notes are dropped first, so they never join
+    or split anything."""
     out: list[str] = []
     for line in lines:
         stripped = line.rstrip()
+        if _is_author_note(line):
+            continue
         if not stripped.strip():
             out.append("")
         elif out and out[-1].endswith("\\"):
