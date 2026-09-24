@@ -10,6 +10,10 @@ from akceo.cli import main
 ROOT = Path(__file__).parents[1]
 DEMO = ROOT / "examples" / "demo"
 EXTERNAL_REF = re.compile(r"""(src|href)=["']?(https?:|//|\.{0,2}/)|<link|@import|url\(""")
+# The vendored Mermaid holds url(#marker) references inside its SVGs and CSS keywords such as
+# @import as strings, so it gets a narrower check of its own: nothing that would load from outside.
+MERMAID_SCRIPT = re.compile(r"<script>\n/\*! Mermaid .*?</script>\n", re.DOTALL)
+OUTSIDE_LOAD = re.compile(r"""(src|href)=["']?(https?:|//)|(url\(|@import\s*(url\()?)["']?(https?:|//)""")
 
 
 def test_builds_the_demo_deck_self_contained(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
@@ -21,7 +25,10 @@ def test_builds_the_demo_deck_self_contained(tmp_path: Path, capsys: pytest.Capt
     assert page.count('<section class="slide') == 8
     assert "__SLIDES__" not in page
     assert "data:image/svg+xml;base64," in page
-    assert not EXTERNAL_REF.search(page)
+    assert page.count('<div class="diagram bare"') == 1
+    assert len(MERMAID_SCRIPT.findall(page)) == 1
+    assert not EXTERNAL_REF.search(MERMAID_SCRIPT.sub("", page))
+    assert not OUTSIDE_LOAD.search(page)
     assert "Author note" not in page
 
 
@@ -61,6 +68,21 @@ def test_image_frame_setting_reaches_the_page(tmp_path: Path):
     page = (tmp_path / "deck.html").read_text()
     assert page.count('<img class="bare" src="data:image/png') == 1
     assert page.count('<img src="data:image/png') == 1
+    assert "/*! Mermaid" not in page and "mermaid-theme" not in page
+
+
+def test_diagram_frames_pick_the_colors(tmp_path: Path):
+    (tmp_path / "flow.mmd").write_text("flowchart LR\n  a --> b\n")
+    (tmp_path / "deck.md").write_text(
+        "---\nlayout: image\nimage: flow.mmd\n---\nlayout: image\nimage-frame: no\nimage: flow.mmd\n"
+    )
+    assert main(["build", str(tmp_path / "deck.md")]) == 0
+    page = (tmp_path / "deck.html").read_text()
+    assert page.count('<div class="diagram" role="img" aria-label="" data-mermaid="default">') == 1
+    assert page.count('<div class="diagram bare" role="img" aria-label="" data-mermaid="theme">') == 1
+    assert page.count('<pre class="diagram-src">flowchart LR\n  a --&gt; b\n</pre>') == 2
+    assert page.count("/*! Mermaid") == 1
+    assert '<script type="application/json" id="mermaid-theme">{"theme": "base", ' in page
 
 
 def test_errors_exit_1_with_a_message(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
@@ -73,6 +95,40 @@ def test_image_errors_name_the_slide(tmp_path: Path, capsys: pytest.CaptureFixtu
     deck.write_text("---\n## One\n---\nlayout: split\nimage: gone.png\n\n## Two\n")
     assert main(["build", str(deck)]) == 1
     assert f"{deck}:4: slide 2: image not found: {tmp_path / 'gone.png'}" in capsys.readouterr().err
+
+
+def test_diagram_errors_name_the_slide_and_the_diagram_line(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    (tmp_path / "flow.mmd").write_text("flowchart LR\n  a --> b\n  b --> c(x]\n")
+    deck = tmp_path / "deck.md"
+    deck.write_text("---\n## One\n---\nlayout: image\nimage: flow.mmd\n")
+    assert main(["build", str(deck)]) == 1
+    assert capsys.readouterr().err == (
+        f"akceo: {deck}:4: slide 2: {tmp_path / 'flow.mmd'}:3: Parse error: "
+        "Expecting 'PE', 'TAGEND', 'UNICODE_TEXT', 'TEXT', 'TAGSTART', got 'SQE'\n"
+    )
+    assert not (tmp_path / "deck.html").exists()
+
+
+def test_missing_diagram(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    deck = tmp_path / "deck.md"
+    deck.write_text("---\nlayout: image\nimage: gone.mmd\n")
+    assert main(["build", str(deck)]) == 1
+    assert f"{deck}:2: slide 1: image not found: {tmp_path / 'gone.mmd'}" in capsys.readouterr().err
+
+
+def test_check_reports_without_writing(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    shutil.copytree(DEMO, tmp_path / "demo", ignore=shutil.ignore_patterns("*.html"))
+    deck = tmp_path / "demo" / "deck.md"
+    assert main(["check", str(deck)]) == 0
+    assert capsys.readouterr().out == f"ok: {deck} (8 slides)\n"
+    assert not (tmp_path / "demo" / "deck.html").exists()
+
+    (tmp_path / "demo" / "flow.mmd").write_text("flowchrt TD\n")
+    assert main(["check", str(deck)]) == 1
+    assert "flow.mmd:1: Mermaid doesn't recognise the diagram type" in capsys.readouterr().err
+    assert not (tmp_path / "demo" / "deck.html").exists()
 
 
 def test_bad_theme_in_deck_names_the_deck(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
@@ -112,8 +168,9 @@ def test_packaged_assets_contain_no_raw_control_characters():
     # A raw NUL in a JavaScript regex is turned into U+FFFD by the HTML parser, which makes the whole
     # viewer script a syntax error while every Python test still passes. Escapes must stay as text.
     package = ROOT / "src" / "akceo"
-    paths = [*package.glob("assets/*"), *package.glob("themes/*.css")]
-    assert len(paths) >= 6
+    paths = [p for p in (*package.rglob("assets/**/*"), *package.glob("themes/*.css")) if p.is_file()]
+    assert package / "assets" / "vendor" / "mermaid" / "mermaid.min.js" in paths
+    assert len(paths) >= 12
     for path in paths:
         text = path.read_text(encoding="utf-8")
         bad = {hex(ord(c)) for c in text if (ord(c) < 32 and c not in "\n\t") or 0xE000 <= ord(c) <= 0xF8FF}

@@ -1,18 +1,18 @@
 """Render a parsed deck into a single self-contained HTML page."""
 
 import html
+import json
 import re
 from importlib import resources
 from pathlib import Path
-from typing import Any
 
-from akceo import images, parse, themes
+from akceo import files, images, mermaid, parse, themes
 from akceo.errors import DeckError
 from akceo.parse import BREAK, Deck, Slide
 
 ASSETS = resources.files("akceo") / "assets"
 DEFAULT_IMAGE_MAX = 2400
-PLACEHOLDER = re.compile(r"__(TITLE|STYLE|SLIDES|SCRIPT)__")
+PLACEHOLDER = re.compile(r"__(TITLE|STYLE|SLIDES|SCRIPT|DIAGRAMS)__")
 
 ESCAPES = (("&", "&amp;"), ("<", "&lt;"), (">", "&gt;"), ("≥", "&ge;"), ("≤", "&le;"), ("·", "&middot;"))
 CODE = "\x00"  # brackets the index of a stashed `code` span, keeping it safe from the other inline rules
@@ -31,17 +31,19 @@ def build(deck_path: Path, theme: str | None = None) -> tuple[str, int]:
         except DeckError as e:
             raise DeckError(f"{deck_path}: {e}") from None
     images_dir = deck_path.parent / Path(deck.config.get("images", ".")).expanduser()
-    mermaid = images.mermaid_config(themes.values(theme_css))
 
-    sections = [
-        render_slide(slide, _image_src(deck, slide, images_dir, mermaid), deck.framed(slide))
-        for slide in deck.slides
-    ]
+    sections: list[str] = []
+    with mermaid.Checker() as checker:
+        for slide in deck.slides:
+            diagram = _diagram(deck, slide, images_dir, checker)
+            image_src = _image_src(deck, slide, images_dir)
+            sections.append(render_slide(slide, image_src, deck.framed(slide), diagram))
     values = {
         "TITLE": escape(deck.title),
         "STYLE": _asset("base.css") + "\n" + theme_css,
         "SLIDES": "\n\n".join(sections),
         "SCRIPT": _asset("deck.js"),
+        "DIAGRAMS": _diagram_scripts(theme_css) if any(map(_is_diagram, deck.slides)) else "",
     }
     page = PLACEHOLDER.sub(lambda m: values[m.group(1)], _asset("page.html"))
     return page, len(sections)
@@ -51,17 +53,45 @@ def _asset(name: str) -> str:
     return (ASSETS / name).read_text(encoding="utf-8")
 
 
-def _image_src(deck: Deck, slide: Slide, images_dir: Path, mermaid: dict[str, Any]) -> str:
-    """The slide's image as a data URI. A diagram without a frame is drawn in the theme's colors; one
-    in a frame keeps Mermaid's default look, since theme colors may not read on the frame's white."""
-    if "image" not in slide.meta:
+def _is_diagram(slide: Slide) -> bool:
+    return slide.meta.get("image", "").lower().endswith(".mmd")
+
+
+def _image_src(deck: Deck, slide: Slide, images_dir: Path) -> str:
+    """The slide's image as a data URI, or nothing for a diagram, which the page draws itself."""
+    if "image" not in slide.meta or _is_diagram(slide):
         return ""
     max_px = int(slide.meta.get("image-max", DEFAULT_IMAGE_MAX))
     try:
-        config = None if deck.framed(slide) else mermaid
-        return images.data_uri(images_dir / slide.meta["image"], max_px, config)
+        return images.data_uri(images_dir / slide.meta["image"], max_px)
     except DeckError as e:
         raise deck.error(slide, str(e)) from None
+
+
+def _diagram(deck: Deck, slide: Slide, images_dir: Path, checker: mermaid.Checker) -> str:
+    """The Mermaid source of the slide's diagram, checked with Mermaid's parser, or nothing."""
+    if not _is_diagram(slide):
+        return ""
+    path = images_dir / slide.meta["image"]
+    try:
+        if not path.is_file():
+            raise DeckError(f"image not found: {path}")
+        source = files.read_text(path, "diagram")
+        checker.check(path, source)
+    except DeckError as e:
+        raise deck.error(slide, str(e)) from None
+    return source
+
+
+def _diagram_scripts(theme_css: str) -> str:
+    """Mermaid, the theme's Mermaid config and the script that draws the diagrams. The config is JSON
+    with < escaped, so no value in it can close the script element."""
+    config = json.dumps(mermaid.config(themes.values(theme_css))).replace("<", "\\u003c")
+    return (
+        f"<script>\n{mermaid.page_script()}\n</script>\n"
+        f'<script type="application/json" id="mermaid-theme">{config}</script>\n'
+        f"<script>\n{_asset('diagrams.js')}</script>\n"
+    )
 
 
 # ---------------------------------------------------------------- inline text
@@ -114,16 +144,28 @@ def _list(tag: str, items: tuple[str, ...], indent: str, attrs: str = "") -> lis
     ]
 
 
-def _figure(slide: Slide, image_src: str, framed: bool) -> str:
+def _figure(slide: Slide, image_src: str, framed: bool, diagram: str) -> str:
     """The slide's image, or a dashed box holding its place while there's no image: line yet. An
-    image without a frame gets the bare class, which drops the panel behind it."""
+    image without a frame gets the bare class, which drops the panel behind it.
+
+    A diagram carries its Mermaid source for the page to draw. One without a frame is drawn in the
+    theme's colors; one in a frame keeps Mermaid's defaults, since theme colors may not read on the
+    frame's white."""
     if "image" not in slide.meta:
         return '<div class="placeholder"></div>'
+    alt = html.escape(slide.meta.get("image-alt", ""))
+    if diagram:
+        cls, colors = ("diagram", "default") if framed else ("diagram bare", "theme")
+        source = html.escape(diagram, quote=False)
+        return (
+            f'<div class="{cls}" role="img" aria-label="{alt}" data-mermaid="{colors}">'
+            f'<pre class="diagram-src">{source}</pre></div>'
+        )
     bare = "" if framed else ' class="bare"'
-    return f'<img{bare} src="{image_src}" alt="{html.escape(slide.meta.get("image-alt", ""))}">'
+    return f'<img{bare} src="{image_src}" alt="{alt}">'
 
 
-def render_slide(slide: Slide, image_src: str = "", framed: bool = True) -> str:
+def render_slide(slide: Slide, image_src: str = "", framed: bool = True, diagram: str = "") -> str:
     kicker = slide.meta.get("kicker")
     kicker_html = [f'    <div class="kicker">{inline(kicker)}</div>'] if kicker else []
 
@@ -141,12 +183,12 @@ def render_slide(slide: Slide, image_src: str = "", framed: bool = True) -> str:
     h2 = f"<h2{_style(slide, 'h2')}>{inline(_text(slide, 'h2'))}</h2>"
 
     if slide.layout == "image":
-        out.append(f'    <div class="figure-full">{_figure(slide, image_src, framed)}</div>')
+        out.append(f'    <div class="figure-full">{_figure(slide, image_src, framed, diagram)}</div>')
 
     elif slide.layout == "split":
         wide = " img-wide" if slide.flag("image-wide") else ""
         out.append(f'    <div class="split{wide}">')
-        out.append(f'      <div class="figwrap">{_figure(slide, image_src, framed)}</div>')
+        out.append(f'      <div class="figwrap">{_figure(slide, image_src, framed, diagram)}</div>')
         out.append("      <div>")
         out.extend("    " + line for line in kicker_html)
         out.append(f"        {h2}")

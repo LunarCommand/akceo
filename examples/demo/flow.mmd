@@ -1,0 +1,5 @@
+%% The same flow as flow.svg, drawn by Mermaid in the deck theme's colors.
+flowchart TD
+  deck["deck.md<br/>slides in Markdown"] --> build
+  theme["theme<br/>built-in or .css file"] --> build
+  build(["akceo build<br/>parse · embed images · render"]) --> html["deck.html<br/>one file, no external assets"]

@@ -182,9 +182,10 @@ sequenceDiagram
 
 - **Self-contained output.** The built page references no external file or URL. CSS,
   JavaScript and images are all inside it.
-- **One runtime dependency.** Pillow, for shrinking images. Everything else is the Python
-  standard library, and the page uses plain JavaScript with no framework. The Mermaid CLI
-  (`mmdc`) is an optional outside tool, needed only for decks that use `.mmd` diagrams.
+- **Everything ships with it.** Two runtime dependencies: Pillow, for shrinking images, and
+  mini-racer, a V8 engine that runs Mermaid's parser to check diagrams. A copy of Mermaid is
+  vendored in `assets/vendor/mermaid/`. Nothing needs installing outside Python. The page uses
+  plain JavaScript with no framework, plus Mermaid when the deck has a diagram.
 - **Fail loudly and precisely.** Input is checked before anything is written. Every error names
   the file it's about, and errors in the deck also give the line and slide.
 - **Content and look are separate.** The deck says what's on each slide; the theme alone decides
@@ -194,28 +195,32 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    cli["cli.py<br/>akceo build / themes / viewer"] --> render["render.py<br/>build()"]
+    cli["cli.py<br/>akceo build / check / themes / viewer"] --> render["render.py<br/>build()"]
     render --> parse["parse.py<br/>load(), validation"]
     parse --> files["files.py<br/>read_text()"]
     render --> themes["themes.py<br/>load(), token check"]
     themes --> files
     render --> images["images.py<br/>data_uri()"]
-    render --> assets[["assets/<br/>page.html · base.css · deck.js"]]
+    render --> mermaid["mermaid.py<br/>Checker, config(), page_script()"]
+    mermaid --> vendor[["assets/vendor/mermaid/<br/>mermaid.min.js · notices"]]
+    render --> assets[["assets/<br/>page.html · base.css · deck.js · diagrams.js"]]
     themes --> builtin[["themes/<br/>midnight.css · paper.css"]]
     cli --> viewer[["assets/md-viewer.html"]]
     parse -.->|raises| err["errors.py<br/>DeckError"]
     themes -.->|raises| err
     images -.->|raises| err
+    mermaid -.->|raises| err
     files -.->|raises| err
 ```
 
 | Module | Job |
 | --- | --- |
-| `cli.py` | Parses arguments, runs a command, writes the output, turns `DeckError` into a message and exit code 1 |
-| `render.py` | Runs the build: loads the deck and theme, embeds images, renders each slide, fills the page template |
+| `cli.py` | Parses arguments, runs a command, writes the output, turns `DeckError` into a message and exit code 1. `check` runs the build and writes nothing. |
+| `render.py` | Runs the build: loads the deck and theme, embeds images, checks diagrams, renders each slide, fills the page template |
 | `parse.py` | Turns Markdown into a validated `Deck`. All input rules live here. |
 | `themes.py` | Finds a theme by name or path, checks that it sets every token, and reads the token values that Mermaid diagrams use |
-| `images.py` | Turns an image file into a `data:` URI, shrinking raster images and drawing Mermaid diagrams with `mmdc` |
+| `images.py` | Turns an image file into a `data:` URI, shrinking raster images |
+| `mermaid.py` | Checks each `.mmd` diagram with Mermaid's parser in V8, builds the theme's Mermaid config, and prepares the vendored script, with its license notices, for the page |
 | `files.py` | Reads user files, turning read and decode failures into `DeckError` |
 | `errors.py` | `DeckError`, the one exception type the CLI reports to the user |
 
@@ -228,17 +233,23 @@ sequenceDiagram
     participant P as parse.load
     participant T as themes.load
     participant I as images.data_uri
+    participant M as mermaid.Checker
     CLI->>R: deck path, optional --theme
     R->>P: read and parse deck.md
     P-->>R: Deck (config + slides)
     R->>T: theme from --theme, else the deck's theme:, else midnight
     T-->>R: theme CSS
     loop each split or image slide with an image: line
-        R->>I: image path, image-max, theme colors if the image has no frame
-        I-->>R: data URI
+        alt a .mmd diagram
+            R->>M: diagram source
+            M-->>R: ok, or DeckError with the diagram's line
+        else any other image
+            R->>I: image path, image-max
+            I-->>R: data URI
+        end
     end
     Note over R: a slide with no image: line gets a dashed placeholder instead
-    R->>R: render slides, fill page.html
+    R->>R: render slides, fill page.html, add Mermaid if a slide has a diagram
     R-->>CLI: HTML, slide count
     CLI->>CLI: write deck.html, print summary
 ```
@@ -313,8 +324,8 @@ literal and why raw HTML is always escaped:
 4. Put the code spans back, escaped.
 5. Turn hard line breaks into `<br>`.
 
-The page comes from `assets/page.html`, which has four placeholders filled in one pass: title,
-styles, slides and script. Filling them in one pass means slide text that happens to contain a
+The page comes from `assets/page.html`, which has five placeholders filled in one pass: title,
+styles, slides, script and diagram scripts. The last is empty unless a slide has a diagram. Filling them in one pass means slide text that happens to contain a
 placeholder name is never replaced.
 
 ### Themes
@@ -339,8 +350,9 @@ flowchart TD
     start["image: file on a split or image slide"] --> exists{"File exists?"}
     exists -->|no| e1["DeckError: image not found"]
     exists -->|yes| mmd{".mmd?"}
-    mmd -->|yes| mmdc["Run mmdc to draw SVG, in the theme's<br/>colors if unframed, then give it a pixel size"]
-    mmdc -->|"no mmdc, or a<br/>Mermaid error"| e3["DeckError"]
+    mmd -->|yes| check["Check with Mermaid's parser in V8"]
+    check -->|"syntax error"| e3["DeckError with the<br/>diagram's line"]
+    check -->|ok| src["Escaped source in a<br/>div for the page to draw"]
     mmd -->|no| svg{"SVG?"}
     svg -->|yes| raw["Embed the bytes unchanged"]
     svg -->|no| fmt{"PNG, JPEG or WebP?"}
@@ -348,11 +360,31 @@ flowchart TD
     fmt -->|yes| fix["Rotate upright from EXIF,<br/>shrink to image-max,<br/>never enlarge"]
     fix --> save["Re-save in the same format<br/>(JPEG and WebP at quality 90)"]
     raw --> uri["base64 data: URI in the img src"]
-    mmdc --> uri
     save --> uri
 ```
 
 Images are processed on every build, so replacing an image file and rebuilding just works.
+
+### Diagrams
+
+A `.mmd` diagram is checked at build time and drawn in the browser.
+
+The check loads `mermaid.min.js` into V8 through mini-racer and calls Mermaid's own `parse()`.
+Mermaid expects a browser, so `assets/mermaid-shims.js` is loaded first. It stands in for the
+three things `parse()` touches: DOMPurify's hooks, `TextEncoder` and `structuredClone`. Mermaid
+drops front matter, `%%{init}%%` lines, `%%` comments and leading blank lines before parsing,
+so the line in its errors counts without them. `mermaid.py` repeats those steps, keeping each
+character's original line, to report the line in the file. One V8 context serves the whole
+build, and it's closed at the end; an open context stops Python from exiting.
+
+The page gets the vendored Mermaid, under a comment that carries its license and the notices of
+every package it bundles, then the theme's Mermaid config as JSON, then `diagrams.js`. That
+script waits for the fonts to load and draws the diagrams one at a time. Each one is drawn with
+the theme config if it has no frame, or Mermaid's defaults if it has one. The SVG replaces the
+source, sized from its `viewBox` so the same CSS that fits an `<img>` to its frame fits the
+diagram. A diagram that Mermaid can't draw shows Mermaid's message instead.
+
+`assets/vendor/mermaid/README.md` covers how the vendored copy is updated.
 
 ### Errors
 
@@ -374,6 +406,9 @@ moves the progress bar and counter, and maps keys and clicks to next and previou
 ignored while text is selected. On load it opens the slide named in the URL hash. On each move
 it writes the new number back with `history.replaceState`, so stepping through slides doesn't
 fill the browser history. A hash typed into the address bar moves to that slide.
+
+In a deck with diagrams, `diagrams.js` draws them once, on load, including those on slides that
+aren't showing yet. See [Diagrams](#diagrams).
 
 ### The notes viewer
 

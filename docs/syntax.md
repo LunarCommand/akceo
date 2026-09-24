@@ -133,13 +133,29 @@ The `split` and `image` layouts embed their image in the page.
   are never enlarged. JPEG and WebP are re-saved at quality 90 and turned upright using their
   EXIF orientation.
 - **SVG** is embedded unchanged.
-- **Mermaid** diagrams in a `.mmd` file are drawn as SVG at build time, then embedded. This
-  needs the Mermaid CLI, which is a separate install: `npm install -g @mermaid-js/mermaid-cli`.
-  Without it, a deck that uses a `.mmd` file stops with a message that says so. Each diagram adds
-  a few seconds to the build. A diagram that Mermaid can't draw stops the build with Mermaid's
-  own error message.
+- **Mermaid** diagrams in a `.mmd` file are drawn as SVG by the page when it opens. akceo
+  includes Mermaid, so nothing else needs installing. See [Mermaid diagrams](#mermaid-diagrams).
 
 Other formats stop the build.
+
+### Mermaid diagrams
+
+The build checks each diagram's syntax with Mermaid's own parser, so a mistake stops the build
+with Mermaid's message and the line in the `.mmd` file:
+
+```
+akceo: deck.md:40: slide 6: flow.mmd:3: Parse error: Expecting 'PE', 'TAGEND', ... got 'SQE'
+```
+
+`akceo check deck.md` runs the same checks without writing a file.
+
+The page then draws each diagram as inline SVG when it opens. A few mistakes only show up at
+that point, such as an invalid date in a `gantt` chart. Those don't stop the build. The slide
+shows Mermaid's message in place of the diagram.
+
+A deck with at least one diagram carries a copy of Mermaid, which adds about 5.6 MB to the
+file. A deck without diagrams doesn't. Mermaid's Font Awesome icons (`fa:fa-car`) don't show,
+because the page loads no outside stylesheets.
 
 ### Frames
 

@@ -94,7 +94,8 @@ dim-last-column: yes
 
 layout: image
 kicker: The image layout
-image: flow.svg
+image: flow.mmd
+image-frame: no
 image-alt: deck.md and a theme go into akceo build, which writes deck.html
 
 ---
