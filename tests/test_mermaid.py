@@ -1,6 +1,7 @@
 import hashlib
 import json
 import re
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -41,7 +42,10 @@ def error(checker: Checker, source: str) -> str:
         'flowchart LR\n  a --> b\n  click a "#5" "Go to slide 5"\n',
         'flowchart LR\n  b@{ img: "data:image/png;base64,AAAA", label: "L" }\n',
         'flowchart LR\n  a["see https://example.com"] --> b\n',
+        'flowchart LR\n  a["Docs, img: https://example.com/guide"] --> b\n',
         'flowchart LR\n  %% click a href "https://example.com"\n  a --> b\n',
+        # url(#…) points inside the SVG itself.
+        '%%{init: {"themeCSS": ".x { marker-end: url(#arrow) }"}}%%\nflowchart LR\n  a --> b\n',
     ],
 )
 def test_valid_diagrams_pass(checker: Checker, source: str):
@@ -92,35 +96,126 @@ def test_an_unknown_diagram_type_names_the_line_it_is_on(checker: Checker, sourc
     )
 
 
-@pytest.mark.parametrize(
-    ("source", "line", "url"),
-    [
-        # The http(s) URL also needs the URL stand-in; without it the check crashed.
-        (
-            'flowchart LR\n  a --> b\n  click a href "https://example.com/docs"\n',
-            3,
-            "https://example.com/docs",
-        ),
-        ('flowchart LR\n  a --> b\n  click a "https://example.com" "tip" _blank\n', 3, "https://example.com"),
-        (
-            'flowchart LR\n  a --> b\n  b@{ img: "https://example.com/x.png", label: "L" }\n',
-            3,
-            "https://example.com/x.png",
-        ),
-        ('flowchart LR\n  b@{\n    label: "L"\n    img: "pic.png"\n  }\n', 4, "pic.png"),
-        (
-            "flowchart LR\n  a --> c[\"<img src='https://example.com/l.png'/> L\"]\n",
-            2,
-            "https://example.com/l.png",
-        ),
-        ("flowchart LR\n  a --> c[\"<a href='https://x.com'>x</a>\"]\n", 2, "https://x.com"),
-    ],
-)
+OUTSIDE = [
+    # The http(s) link also needs the URL stand-in; without it the check crashed.
+    ('flowchart LR\n  a --> b\n  click a href "https://x.example/docs"\n', 3, "https://x.example/docs"),
+    ('flowchart LR\n  a --> b\n  click a "https://x.example" "tip" _blank\n', 3, "https://x.example"),
+    ('flowchart LR\n  a --> b; click a href "https://x.example"\n', 2, "https://x.example"),
+    ('classDiagram\n  class Foo\n  link Foo "https://x.example"\n', 3, "https://x.example"),
+    ("sequenceDiagram\n  participant A\n  link A: Home @ https://x.example\n", 3, "https://x.example"),
+    ('sequenceDiagram\n  participant A\n  links A: {"Home": "https://x.example"}\n', 3, "https://x.example"),
+    ('C4Context\n  Person(a, "A", $link="https://x.example")\n', 2, "https://x.example"),
+    ("flowchart LR\n  a --> c[\"<a href='https://x.example'>x</a>\"]\n", 2, "https://x.example"),
+    # Image shapes, quoted key or not, on one line or several.
+    (
+        'flowchart LR\n  a --> b\n  b@{ img: "https://x.example/i.png", label: "L" }\n',
+        3,
+        "https://x.example/i.png",
+    ),
+    ('flowchart LR\n  b@{ "img": "https://x.example/i.png", label: "L" }\n', 2, "https://x.example/i.png"),
+    ('flowchart LR\n  b@{\n    label: "L"\n    img: "pic.png"\n  }\n', 4, "pic.png"),
+    # HTML in a label: src with a padded value, srcset, and a tag split over two lines.
+    ("flowchart LR\n  a --> c[\"<img src=' https://x.example/l.png'/> L\"]\n", 2, "https://x.example/l.png"),
+    ("flowchart LR\n  a --> c[\"<img srcset='https://x.example/s.png'> L\"]\n", 2, "https://x.example/s.png"),
+    ("flowchart LR\n  a --> c[\"<img\nsrc='https://x.example/t.png'> L\"]\n", 3, "https://x.example/t.png"),
+    # CSS: themeCSS in a directive or front matter, and style= in a label.
+    (
+        '%%{init: {"themeCSS": ".node rect { fill: url(https://x.example/f.png) }"}}%%\n'
+        "flowchart LR\n  a --> b\n",
+        1,
+        "https://x.example/f.png",
+    ),
+    (
+        '---\nconfig:\n  themeCSS: "@import url(https://x.example/c.css);"\n---\nflowchart LR\n  a --> b\n',
+        3,
+        "https://x.example/c.css",
+    ),
+    (
+        "flowchart LR\n  a[\"<span style='background:url(https://x.example/b.png)'>x</span>\"] --> b\n",
+        2,
+        "https://x.example/b.png",
+    ),
+]
+
+
+@pytest.mark.parametrize(("source", "line", "url"), OUTSIDE)
 def test_diagrams_cant_load_or_link_outside_the_deck(checker: Checker, source: str, line: int, url: str):
     assert error(checker, source) == (
         f"flow.mmd:{line}: a diagram can't load or link to anything outside the deck ({url}); "
         "use a data: URI for an image and a #anchor, such as #3 for slide 3, for a link"
     )
+
+
+def test_a_diagram_too_long_for_mermaid_to_draw(checker: Checker):
+    source = "flowchart LR\n" + "".join(f"  n{i} --> n{i + 1}\n" for i in range(3500))
+    size = len(source)
+    assert size > 50_000
+    assert error(checker, source) == (
+        f"flow.mmd: the diagram is {size:,} characters long, over Mermaid's limit of 50,000; "
+        "split it into smaller diagrams"
+    )
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        # YAML errors count lines within the snippet Mermaid parsed, so the check finds the snippet.
+        (
+            "flowchart LR\n  a --> b\n  c@{ shape: [rect }\n",
+            "3: missed comma between flow collection entries",
+        ),
+        (
+            "flowchart LR\n  a --> b\n  c@{\n    shape: rect\n    label: [x\n  }\n",
+            "6: unexpected end of the stream within a flow collection",
+        ),
+        (
+            "---\ntitle: [x\n---\nflowchart LR\n  a --> b\n",
+            "2: unexpected end of the stream within a flow collection",
+        ),
+        ("flowchart LR\n  a --> b\n  c@{ shape: nosuch }\n", "3: No such shape: nosuch."),
+    ],
+)
+def test_yaml_and_shape_errors_name_the_line(checker: Checker, source: str, expected: str):
+    assert error(checker, source) == f"flow.mmd:{expected}"
+
+
+def fake_worker(monkeypatch: pytest.MonkeyPatch, code: str) -> None:
+    """Stand in for the V8 worker with a small Python program, to test how Checker handles it."""
+    monkeypatch.setattr(mermaid, "WORKER", [sys.executable, "-c", code])
+
+
+READY = "import sys, time; print('{\"max_text_size\": 50000}', flush=True); "
+
+
+def test_a_diagram_that_hangs_mermaid_stops_the_build(monkeypatch: pytest.MonkeyPatch):
+    fake_worker(monkeypatch, READY + "sys.stdin.readline(); time.sleep(60)")
+    monkeypatch.setattr(mermaid, "PARSE_TIMEOUT", 0.5)
+    checker = Checker()
+    with pytest.raises(DeckError, match=r"^flow\.mmd: Mermaid took over 0\.5s to check the diagram$"):
+        checker.check(FLOW, "flowchart LR\n")
+    assert checker._worker is None  # pyright: ignore[reportPrivateUsage]
+
+
+def test_a_worker_that_never_starts(monkeypatch: pytest.MonkeyPatch):
+    fake_worker(monkeypatch, "import time; time.sleep(60)")
+    monkeypatch.setattr(mermaid, "START_TIMEOUT", 0.5)
+    with Checker() as checker, pytest.raises(DeckError, match=r"took over 0\.5s to load Mermaid$"):
+        checker.check(FLOW, "flowchart LR\n")
+
+
+def test_a_worker_that_dies_is_a_bug_not_a_deck_error(monkeypatch: pytest.MonkeyPatch):
+    fake_worker(monkeypatch, READY + "sys.stdin.readline()")
+    with Checker() as checker, pytest.raises(RuntimeError, match="stopped unexpectedly"):
+        checker.check(FLOW, "flowchart LR\n")
+
+
+def test_closing_stops_the_worker(checker: Checker):
+    fresh = Checker()
+    fresh.check(FLOW, "flowchart LR\n  a --> b\n")
+    worker = fresh._worker  # pyright: ignore[reportPrivateUsage]
+    assert worker is not None and worker.poll() is None
+    fresh.close()
+    assert worker.poll() is not None
 
 
 MIDNIGHT = {"bg": "#0b0f16", "line": "#23324a", "text": "#e8eef6", "muted": "#93a4bd", "accent": "#5eead4"}
@@ -151,6 +246,15 @@ def test_vendored_mermaid_matches_its_manifest():
     manifest = json.loads((mermaid.VENDOR / "manifest.json").read_text(encoding="utf-8"))
     script = (mermaid.VENDOR / "mermaid.min.js").read_bytes()
     assert hashlib.sha256(script).hexdigest() == manifest["sha256"]
+
+
+def test_notices_list_the_bundled_packages():
+    notices = (mermaid.VENDOR / "THIRD_PARTY_NOTICES").read_text(encoding="utf-8")
+    headings = re.findall(r"^-{72}\n(\S+) (\S+)\nLicense: ", notices, re.MULTILINE)
+    names = {name for name, _ in headings}
+    assert len(headings) >= 100
+    assert {"d3", "dompurify", "elkjs", "cytoscape", "langium", "chevrotain"} <= names
+    assert ("dompurify", "3.4.12") in headings  # the version the bundle was built with
 
 
 def test_page_script_carries_the_license_notices():

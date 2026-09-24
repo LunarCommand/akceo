@@ -12,6 +12,11 @@ DEMO = ROOT / "examples" / "demo"
 EXTERNAL_REF = re.compile(r"""(src|href)=["']?(https?:|//|\.{0,2}/)|<link|@import|url\(""")
 # The vendored Mermaid holds url(#marker) references inside its SVGs and CSS keywords such as
 # @import as strings, so it gets a narrower check of its own: nothing that would load from outside.
+# The browser itself refuses any outside load, whatever a diagram or theme tries.
+CSP = (
+    "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'unsafe-inline'; "
+    "style-src 'unsafe-inline'; img-src data:; font-src data:\">"
+)
 MERMAID_SCRIPT = re.compile(r"<script>\n/\*! Mermaid .*?</script>\n", re.DOTALL)
 OUTSIDE_LOAD = re.compile(r"""(src|href)=["']?(https?:|//)|(url\(|@import\s*(url\()?)["']?(https?:|//)""")
 
@@ -25,6 +30,8 @@ def test_builds_the_demo_deck_self_contained(tmp_path: Path, capsys: pytest.Capt
     assert page.count('<section class="slide') == 8
     assert "__SLIDES__" not in page
     assert "data:image/svg+xml;base64," in page
+    assert page.count(CSP) == 1
+    assert page.index(CSP) < page.index("<style>")
     assert page.count('<div class="diagram bare"') == 1
     assert len(MERMAID_SCRIPT.findall(page)) == 1
     assert not EXTERNAL_REF.search(MERMAID_SCRIPT.sub("", page))
@@ -69,6 +76,7 @@ def test_image_frame_setting_reaches_the_page(tmp_path: Path):
     assert page.count('<img class="bare" src="data:image/png') == 1
     assert page.count('<img src="data:image/png') == 1
     assert "/*! Mermaid" not in page and "mermaid-theme" not in page
+    assert page.count(CSP) == 1
 
 
 def test_diagram_frames_pick_the_colors(tmp_path: Path):

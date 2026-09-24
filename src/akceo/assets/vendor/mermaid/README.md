@@ -13,12 +13,18 @@ the notices come from, and the SHA-256 of the file here. A test checks the file 
 ## Licenses
 
 Mermaid is MIT licensed; see `LICENSE`. The file also bundles other packages, listed with their
-license texts in `THIRD_PARTY_NOTICES`. The list comes from `pnpm-lock.yaml` in Mermaid's repository
-at the release tag, the lockfile the bundle was built from, so each version matches the bundle. It
-covers Mermaid's production dependencies, plus the devDependencies that its workspace packages
-(`@mermaid-js/parser`) compile into their own output, such as langium. One of them, elkjs, is EPL-2.0, which asks that recipients
-be told where its source is: https://github.com/kieler/elkjs. Every built deck that has a diagram
-carries a comment saying so.
+license texts in `THIRD_PARTY_NOTICES`. The list comes from `pnpm-lock.yaml` in Mermaid's
+repository at the release tag, the lockfile the bundle was built from, so each version matches the
+bundle. It covers Mermaid's production dependencies, optional ones included, plus the
+devDependencies that the linked workspace package `@mermaid-js/parser` compiles into its own output,
+such as langium.
+
+Not covered yet: Mermaid's own devDependencies (about 40). If esbuild inlines one of them into the
+bundle, it is missing from the notices, and the script doesn't notice.
+
+One bundled package, elkjs, is EPL-2.0, which asks that recipients be told where its source is:
+https://github.com/kieler/elkjs. Every built deck that has a diagram carries the notices, and that
+line, in a comment.
 
 ## The one change from upstream
 
@@ -34,10 +40,17 @@ uv run pytest
 ```
 
 The script downloads the tarball, checks it against npm's integrity hash, applies the change above
-and rewrites every file in this folder. For the notices it downloads each locked package and checks
-it against the lockfile's integrity hash. If a workspace package has a devDependency the script
-hasn't seen, it stops: check whether that package ends up in `mermaid.min.js`, then add it to
-`BUNDLED_DEV_DEPENDENCIES` or `BUILD_ONLY_DEV_DEPENDENCIES` in the script. Then run the full test suite: `tests/test_mermaid.py` runs
-the real parser, so a Mermaid release that no longer works with the stand-ins in
-`assets/mermaid-shims.js` fails there. Build `examples/demo/deck.md` and look at the diagram slide
-too, since drawing isn't covered by the tests.
+and builds the notices by downloading each locked package and checking it against the lockfile's
+integrity hash. It writes the folder only after every step succeeds, so a failed update leaves it
+as it was. It stops, and writes nothing, when:
+
+- a linked workspace package (today only `@mermaid-js/parser`) has a devDependency the script
+  hasn't sorted. Check whether that package ends up in `mermaid.min.js`, then add it to
+  `BUNDLED_DEV_DEPENDENCIES` or `BUILD_ONLY_DEV_DEPENDENCIES` in the script.
+- the walk misses a package the bundle certainly holds (`ANCHOR_PACKAGES`), which means the
+  lockfile's layout has changed under the script's reader.
+- a package has no license file. Find its copyright notice, then add it to `NO_LICENSE_FILE`.
+
+Then run the full test suite: `tests/test_mermaid.py` runs the real parser, so a Mermaid release
+that no longer works with the stand-ins in `assets/mermaid-shims.js` fails there. Build
+`examples/demo/deck.md` and look at the diagram slide too, since drawing isn't covered by the tests.

@@ -41,6 +41,12 @@ LICENSE_NAMES = ("LICENSE", "LICENCE", "COPYING", "NOTICE")
 QUOTES = "\"'"
 # Type definitions are never bundled into the JavaScript, so they need no notice.
 SKIP_PREFIXES = ("@types/",)
+# Packages the bundle certainly holds. If the walk misses one, the lockfile's layout has changed
+# under the reader, and the notices would be incomplete.
+ANCHOR_PACKAGES = {"d3", "dompurify", "elkjs", "cytoscape", "langium", "chevrotain"}
+# Packages known to ship no license file, whose notice is only the license named in package.json.
+# Empty today; any other package without one stops the update.
+NO_LICENSE_FILE: set[str] = set()
 
 
 def main(version: str) -> None:
@@ -55,11 +61,8 @@ def main(version: str) -> None:
         license_text = _member(tar, "package/LICENSE").decode("utf-8")
 
     script, escaped = _escape_control_characters(script)
-    VENDOR.mkdir(parents=True, exist_ok=True)
-    (VENDOR / "mermaid.min.js").write_text(script, encoding="utf-8", newline="")
-    (VENDOR / "LICENSE").write_text(license_text, encoding="utf-8")
     lockfile = LOCKFILE.format(tag=urllib.parse.quote(f"mermaid@{version}"))
-    (VENDOR / "THIRD_PARTY_NOTICES").write_text(_notices(version, lockfile), encoding="utf-8")
+    notices = _notices(version, lockfile)
     manifest = {
         "version": version,
         "source": meta["dist"]["tarball"],
@@ -68,6 +71,12 @@ def main(version: str) -> None:
         "sha256": hashlib.sha256(script.encode("utf-8")).hexdigest(),
         "escaped_control_characters": escaped,
     }
+    # Everything is fetched and checked before anything is written, so a failed update leaves the
+    # folder as it was.
+    VENDOR.mkdir(parents=True, exist_ok=True)
+    (VENDOR / "mermaid.min.js").write_text(script, encoding="utf-8", newline="")
+    (VENDOR / "LICENSE").write_text(license_text, encoding="utf-8")
+    (VENDOR / "THIRD_PARTY_NOTICES").write_text(notices, encoding="utf-8")
     (VENDOR / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(f"vendored mermaid {version}: {len(script) / 1e6:.1f} MB, {escaped} control characters escaped")
     print("now run: uv run pytest tests/test_mermaid.py")
@@ -108,11 +117,26 @@ def _notices(version: str, lockfile_url: str) -> str:
     hold a package the bundle leaves out, which errs toward too many notices, but every version is
     the one the bundle was built with."""
     lock = _Lockfile(_fetch(lockfile_url).decode("utf-8"))
-    packages = sorted(map(_package_notice, lock.closure(IMPORTER)), key=lambda p: (p[0].lower(), p[1]))
+    if IMPORTER not in lock.importers:
+        sys.exit(f"the lockfile has no {IMPORTER} importer; its layout may have changed")
+    closure = lock.closure(IMPORTER)
+    missing = ANCHOR_PACKAGES - {name for name, _, _ in closure}
+    if missing:
+        sys.exit(f"the dependency walk missed {', '.join(sorted(missing))}; check the lockfile reader")
+    packages = sorted(map(_package_notice, closure), key=lambda p: (p[0].lower(), p[1]))
+    unlicensed = [f"{n}@{v}" for n, v, _, text in packages if not text and n not in NO_LICENSE_FILE]
+    if unlicensed:
+        sys.exit(
+            f"no license file in {', '.join(unlicensed)}. Find each package's copyright notice, then add "
+            "it to NO_LICENSE_FILE once its package.json license is enough."
+        )
     sections = [
         f"Third-party software in mermaid.min.js (Mermaid {version})\n"
         "==========================================================\n\n"
-        "mermaid.min.js bundles the packages below. Each is used under the license named with it.\n"
+        "These are the packages mermaid.min.js is built from, each used under the license named\n"
+        "with it: Mermaid's production dependencies, including optional ones, and the\n"
+        "devDependencies that @mermaid-js/parser compiles into its own output. Mermaid's own\n"
+        "devDependencies are not checked yet; see README.md in this folder.\n"
         f"The versions are the ones pinned by the lockfile the release was built from:\n{lockfile_url}\n\n"
         "elkjs (the Eclipse Layout Kernel) is licensed under the Eclipse Public License 2.0. Its source\n"
         "code is available at https://github.com/kieler/elkjs and https://github.com/eclipse/elk.\n\n"
@@ -120,8 +144,11 @@ def _notices(version: str, lockfile_url: str) -> str:
     ]
     for name, package_version, license_name, text in packages:
         heading = f"{name} {package_version}\nLicense: {license_name}"
-        sections.append(f"\n{'-' * 72}\n{heading}\n\n{text.strip()}\n")
+        sections.append(f"\n{'-' * 72}\n{heading}\n\n{(text or '(no license file)').strip()}\n")
     return "".join(sections)
+
+
+IMPORTER_GROUPS = ("dependencies", "optionalDependencies", "devDependencies")
 
 
 class _Lockfile:
@@ -154,12 +181,12 @@ class _Lockfile:
                     found = re.search(r"integrity: ([^,}]+)", value)
                     if found:
                         self.integrity[entry] = found.group(1).strip()
-            elif section == "importers" and group in ("dependencies", "devDependencies"):
+            elif section == "importers" and group in IMPORTER_GROUPS:
                 if indent == 6:
                     dependency = key
                 elif indent == 8 and key == "version":
                     self.importers.setdefault(entry, {}).setdefault(group, {})[dependency] = value
-            elif section == "snapshots" and group == "dependencies" and indent == 6:
+            elif section == "snapshots" and group in ("dependencies", "optionalDependencies") and indent == 6:
                 self.snapshots.setdefault(entry, {})[key] = value.strip("'")
 
     def closure(self, importer: str) -> list[tuple[str, str, str]]:
@@ -167,7 +194,7 @@ class _Lockfile:
         A workspace link (link:../parser) is part of Mermaid itself, so follow its dependencies and
         the devDependencies it bundles."""
         found: dict[str, tuple[str, str, str]] = {}
-        pending = [(importer, n, v) for n, v in self._group(importer, "dependencies").items()]
+        pending = [(importer, n, v) for n, v in self._production(importer).items()]
         while pending:
             owner, name, version = pending.pop()
             if version.startswith("link:"):
@@ -188,6 +215,9 @@ class _Lockfile:
     def _group(self, importer: str, group: str) -> dict[str, str]:
         return self.importers.get(importer, {}).get(group, {})
 
+    def _production(self, importer: str) -> dict[str, str]:
+        return {**self._group(importer, "dependencies"), **self._group(importer, "optionalDependencies")}
+
     def _linked(self, importer: str) -> dict[str, str]:
         """A linked workspace package's dependencies plus the devDependencies it bundles."""
         bundled = BUNDLED_DEV_DEPENDENCIES.get(importer, set())
@@ -200,7 +230,7 @@ class _Lockfile:
                 "whether each ends up in mermaid.min.js, then add it to BUNDLED_DEV_DEPENDENCIES or "
                 "BUILD_ONLY_DEV_DEPENDENCIES."
             )
-        return {**self._group(importer, "dependencies"), **{n: v for n, v in dev.items() if n in bundled}}
+        return {**self._production(importer), **{n: v for n, v in dev.items() if n in bundled}}
 
 
 def _package_notice(package: tuple[str, str, str]) -> tuple[str, str, str, str]:
@@ -222,7 +252,7 @@ def _package_notice(package: tuple[str, str, str]) -> tuple[str, str, str, str]:
         ]
     text = "\n\n".join(texts)
     license_name = data.get("license") or ("see license text" if text else "not stated")
-    return name, version, str(license_name), text or "(no license file)"
+    return name, version, str(license_name), text
 
 
 def _read(tar: tarfile.TarFile, member: tarfile.TarInfo) -> str:

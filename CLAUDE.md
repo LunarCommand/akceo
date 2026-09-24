@@ -8,8 +8,9 @@ dependencies are Pillow (images) and mini-racer (V8, to check Mermaid diagrams a
 - `src/akceo/parse.py`: the Markdown dialect into a validated `Deck`. All input checks live here.
 - `src/akceo/render.py`: slides to HTML, inline markup, page assembly.
 - `src/akceo/images.py`: image files to data URIs.
-- `src/akceo/mermaid.py`: the build-time diagram check, the theme's Mermaid config, and the
-  vendored Mermaid script with its license notices, ready for the page.
+- `src/akceo/mermaid.py`: the build-time diagram check (V8 in a child process it runs as
+  `python -m akceo.mermaid`), the theme's Mermaid config, and the vendored Mermaid script with its
+  license notices, ready for the page.
 - `src/akceo/themes.py`: theme lookup and the token check.
 - `src/akceo/files.py`: reads user-supplied text files, turning read failures into `DeckError`.
 - `src/akceo/cli.py`: the `akceo` command.
@@ -39,7 +40,8 @@ uv run akceo check examples/demo/deck.md
 
 ## Rules
 
-- The built HTML must not reference any external file or URL.
+- The built HTML must not reference any external file or URL. The Content-Security-Policy in
+  `assets/page.html` enforces this in the browser; don't loosen it.
 - `docs/syntax.md` is the format reference. Update it in the same change as any parser, renderer
   or token change.
 - A new theme token goes in `themes.TOKENS`, every built-in theme, and `docs/syntax.md`.

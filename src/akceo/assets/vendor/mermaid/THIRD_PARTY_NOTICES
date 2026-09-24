@@ -1,7 +1,10 @@
 Third-party software in mermaid.min.js (Mermaid 12.0.0)
 ==========================================================
 
-mermaid.min.js bundles the packages below. Each is used under the license named with it.
+These are the packages mermaid.min.js is built from, each used under the license named
+with it: Mermaid's production dependencies, including optional ones, and the
+devDependencies that @mermaid-js/parser compiles into its own output. Mermaid's own
+devDependencies are not checked yet; see README.md in this folder.
 The versions are the ones pinned by the lockfile the release was built from:
 https://raw.githubusercontent.com/mermaid-js/mermaid/mermaid%4012.0.0/pnpm-lock.yaml
 

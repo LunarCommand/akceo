@@ -370,24 +370,35 @@ Images are processed on every build, so replacing an image file and rebuilding j
 A `.mmd` diagram is checked at build time and drawn in the browser.
 
 The check loads `mermaid.min.js` into V8 through mini-racer and calls Mermaid's own `parse()`.
-Mermaid expects a browser, so `assets/mermaid-shims.js` is loaded first. It stands in for the
+V8 runs in a child process (`python -m akceo.mermaid`) that answers one diagram per line of JSON.
+mini-racer can't interrupt JavaScript that runs after an `await`, and `parse()` is async, so a
+diagram that sent Mermaid into a loop would otherwise hang the build. The child is killed when a
+diagram takes over 10 seconds, on Ctrl-C, and when the build ends. Mermaid expects a browser, so `assets/mermaid-shims.js` is loaded first. It stands in for the
 things `parse()` touches: DOMPurify's hooks, `TextEncoder`, `structuredClone` and `URL`. Mermaid
 drops front matter, `%%{init}%%` lines, `%%` comments and leading blank lines before parsing,
 so the line in its errors counts without them. `mermaid.py` repeats those steps, keeping each
-character's original line, to report the line in the file. One V8 context serves the whole
-build, and it's closed at the end; an open context stops Python from exiting.
+character's original line, to report the line in the file. A YAML error, from front matter or
+`@{…}` shape data, counts lines within that snippet instead. The check finds the snippet by parsing
+the front matter, and then each `@{…}` block, on its own, and adds the snippet's line.
 
-A diagram that parses is then scanned for references outside the deck: `click` links, image
-shapes and `src` or `href` in label HTML. Only `#` anchors and `data:` URIs pass. This has to
-happen at build time, because Mermaid fetches images while it draws. `diagrams.js` also strips
-any other `href` or `src` from the drawn SVG, as a backstop.
+Before parsing, a diagram longer than Mermaid's `maxTextSize` stops the build: `parse()` doesn't
+enforce that limit, but drawing does. After parsing, the whole source is scanned for links and
+loads that leave the deck (see [syntax.md](syntax.md#mermaid-diagrams)). Only `#` anchors and
+`data:` URIs pass.
+
+The scan is there for the message. What keeps the page self-contained is the
+Content-Security-Policy in `page.html`, which lets the page run only its own inline scripts and
+styles and load only `data:` images and fonts. Mermaid fetches label images while it draws, so
+nothing done to the SVG afterwards could stop that load; the policy does. `diagrams.js` also
+drops any link to outside the deck from the drawn SVG, so a click can't leave it.
 
 The page gets the vendored Mermaid, under a comment that carries its license and the notices of
 every package it bundles, then the theme's Mermaid config as JSON, then `diagrams.js`. That
 script waits for the fonts to load and draws the diagrams one at a time. Each one is drawn with
 the theme config if it has no frame, or Mermaid's defaults if it has one. The SVG replaces the
 source, sized from its `viewBox` so the same CSS that fits an `<img>` to its frame fits the
-diagram. A diagram that Mermaid can't draw shows Mermaid's message instead.
+diagram. A diagram that Mermaid can't draw, or any other error while drawing, shows the message
+in place of that diagram, and the rest still draw.
 
 `assets/vendor/mermaid/README.md` covers how the vendored copy is updated.
 

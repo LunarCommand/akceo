@@ -57,12 +57,20 @@ globalThis.URL = class URL {
   }
 };
 
-// Resolves to null when the diagram parses, or to Mermaid's error message when it doesn't.
+// Resolves to null when the diagram parses, or to Mermaid's error as JSON. A YAML error from front
+// matter or @{...} shape data counts its line within that snippet, not within the file.
 globalThis.akceoCheck = async (source) => {
   try {
     await mermaid.parse(source);
     return null;
   } catch (e) {
-    return String((e && e.message) || e);
+    return JSON.stringify({
+      name: String((e && e.name) || "Error"),
+      message: String((e && e.message) || e),
+      yamlLine: e && e.mark && typeof e.mark.line === "number" ? e.mark.line : null,
+    });
   }
 };
+
+// Mermaid refuses to draw a longer diagram. parse() doesn't check it, so the build does.
+globalThis.akceoMaxTextSize = () => mermaid.mermaidAPI.getConfig().maxTextSize;
