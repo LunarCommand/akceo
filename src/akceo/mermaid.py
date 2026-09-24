@@ -38,23 +38,31 @@ COMMENT = re.compile(r"^\s*%%(?!\{)[^\n]+\n?", re.MULTILINE)
 # Ways a diagram can link to or load something outside the deck. The page's Content-Security-Policy
 # blocks every outside load, however it's spelled; this scan is here to stop the build with a clear
 # message and a line for the usual spellings. Only #anchors may be linked and data: URIs loaded.
+# A value may sit in a JSON string inside an %%{init}%% line, as \"https://…\", so each pattern
+# allows a backslash before a quote and leaves backslashes out of the URL it captures.
 LINKS = [
-    re.compile(r"""(?:^|;)[ \t]*click\s+\S+\s+(?:href\s+)?["']([^"']*)["']""", re.MULTILINE),
-    re.compile(r"""(?:^|;)[ \t]*link\s+\S+\s+["']([^"']*)["']""", re.MULTILINE),  # classDiagram
+    re.compile(r"""(?:^|;)[ \t]*click\s+\S+\s+(?:href\s+)?\\?["']([^"'\\]*)\\?["']""", re.MULTILINE),
+    re.compile(r"""(?:^|;)[ \t]*link\s+\S+\s+\\?["']([^"'\\]*)\\?["']""", re.MULTILINE),  # classDiagram
     re.compile(r"""(?:^|;)[ \t]*link\s+[^:\n]+:[^@\n]*@\s*(\S+)""", re.MULTILINE),  # sequenceDiagram
-    re.compile(r"""\$link\s*=\s*["']([^"']*)["']"""),  # C4
-    re.compile(r"""<[a-z][^>]*?\b(?:xlink:)?href\s*=\s*["']?\s*([^"'\s>]*)""", re.IGNORECASE),
+    re.compile(r"""\$link\s*=\s*\\?["']([^"'\\]*)\\?["']"""),  # C4
+    re.compile(r"""<[a-z][^>]*?\b(?:xlink:)?href\s*=\s*\\?["']?\s*([^"'\\\s>]*)""", re.IGNORECASE),
 ]
 # sequenceDiagram: links A: {"Docs": "https://…"}. Each value in the braces is a link.
 SEQUENCE_LINKS = re.compile(r"""(?:^|;)[ \t]*links\s+[^:\n]+:\s*(\{[^\n]*\})""", re.MULTILINE)
-SEQUENCE_LINK_VALUE = re.compile(r""":\s*["']([^"']*)["']""")
+SEQUENCE_LINK_VALUE = re.compile(r""":\s*\\?["']([^"'\\]*)\\?["']""")
 LOADS = [
-    re.compile(r"""<[a-z][^>]*?\b(?:src|srcset|poster|background|data)\s*=\s*["']?\s*([^"'\s>,]*)""", re.I),
-    re.compile(r"""url\(\s*["']?\s*([^"')\s]*)""", re.IGNORECASE),
-    re.compile(r"""@import\b\s*(?:url\()?\s*["']?\s*([^"')\s;]*)""", re.IGNORECASE),
+    re.compile(r"""<[a-z][^>]*?\b(?:src|poster|background|data)\s*=\s*\\?["']?\s*([^"'\\\s>]*)""", re.I),
+    re.compile(r"""url\(\s*\\?["']?\s*([^"'\\)\s]*)""", re.IGNORECASE),
+    re.compile(r"""@import\b\s*(?:url\()?\s*\\?["']?\s*([^"'\\)\s;]*)""", re.IGNORECASE),
+]
+# srcset holds a list of candidates, "url descriptor, url descriptor", and a data: URL has commas
+# of its own, so its whole value is captured and split the way the HTML spec does.
+SRCSET = [
+    re.compile(r"""<[a-z][^>]*?\bsrcset\s*=\s*\\?(["'])(.*?)\\?\1""", re.IGNORECASE | re.DOTALL),
+    re.compile(r"""<[a-z][^>]*?\bsrcset\s*=\s*()([^"'\\\s>]+)""", re.IGNORECASE),
 ]
 SHAPE_DATA = re.compile(r"@\{.*?\}", re.DOTALL)
-IMAGE_KEY = re.compile(r"""["']?\bimg["']?\s*:\s*["']?\s*([^"',}\s]*)""")
+IMAGE_KEY = re.compile(r"""\\?["']?\bimg\\?["']?\s*:\s*\\?["']?\s*([^"'\\,}\s]*)""")
 
 LINE_REF = re.compile(r"\bline (\d+)")
 JISON_ERROR = re.compile(r"(Parse|Lexical) error on line (\d+)[:.]?\s*(.*)", re.DOTALL)
@@ -222,6 +230,12 @@ def outside_reference(source: str) -> tuple[int, str] | None:
     found = [(index, url) for index, url in links if not url.startswith("#")]
     loads = [(m.start(1), m.group(1)) for pattern in LOADS for m in pattern.finditer(text)]
     loads += [
+        (m.start(2) + index, url)
+        for pattern in SRCSET
+        for m in pattern.finditer(text)
+        for index, url in _srcset_urls(m.group(2))
+    ]
+    loads += [
         (block.start() + m.start(1), m.group(1))
         for block in SHAPE_DATA.finditer(text)
         for m in IMAGE_KEY.finditer(block.group(0))
@@ -237,6 +251,26 @@ def outside_reference(source: str) -> tuple[int, str] | None:
         return None
     index, url = min(found)
     return _line_at(source, index), url
+
+
+def _srcset_urls(value: str) -> list[tuple[int, str]]:
+    """Each candidate URL in a srcset value, with its offset. As the HTML spec reads it, a URL runs
+    to the next whitespace, less any trailing commas, and its descriptors run to the next comma."""
+    urls: list[tuple[int, str]] = []
+    i = 0
+    while i < len(value):
+        while i < len(value) and (value[i].isspace() or value[i] == ","):
+            i += 1
+        start = i
+        while i < len(value) and not value[i].isspace():
+            i += 1
+        url = value[start:i].rstrip(",")
+        if url:
+            urls.append((start, url))
+        if not value[start:i].endswith(","):
+            while i < len(value) and value[i] != ",":
+                i += 1
+    return urls
 
 
 def explain(path: Path, source: str, message: str, line: int | None = None) -> str:

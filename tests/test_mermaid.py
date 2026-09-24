@@ -44,6 +44,9 @@ def error(checker: Checker, source: str) -> str:
         'flowchart LR\n  a["see https://example.com"] --> b\n',
         'flowchart LR\n  a["Docs, img: https://example.com/guide"] --> b\n',
         'flowchart LR\n  %% click a href "https://example.com"\n  a --> b\n',
+        # A srcset of data: URIs only, whose own commas don't split it.
+        "flowchart LR\n  a[\"<img srcset='data:image/png;base64,AAAA 1x, "
+        "data:image/png;base64,BB 2x'>\"] --> b\n",
         # url(#…) points inside the SVG itself.
         '%%{init: {"themeCSS": ".x { marker-end: url(#arrow) }"}}%%\nflowchart LR\n  a --> b\n',
     ],
@@ -118,6 +121,27 @@ OUTSIDE = [
     ("flowchart LR\n  a --> c[\"<img src=' https://x.example/l.png'/> L\"]\n", 2, "https://x.example/l.png"),
     ("flowchart LR\n  a --> c[\"<img srcset='https://x.example/s.png'> L\"]\n", 2, "https://x.example/s.png"),
     ("flowchart LR\n  a --> c[\"<img\nsrc='https://x.example/t.png'> L\"]\n", 3, "https://x.example/t.png"),
+    # srcset: every candidate is checked, data: first or not, quoted or not.
+    (
+        "flowchart LR\n  a[\"<img srcset='data:image/png;base64,AAAA 1x, "
+        "https://x.example/i.png 2x'>\"] --> b\n",
+        2,
+        "https://x.example/i.png",
+    ),
+    ('flowchart LR\n  a["<img srcset=https://x.example/u.png>"] --> b\n', 2, "https://x.example/u.png"),
+    # Each url( is checked on its own, so one after a data: URL is still caught.
+    (
+        "flowchart LR\n  a[\"<span style='background: url(data:image/png;base64,AAAA), "
+        "url(https://x.example/b.png)'>x</span>\"] --> b\n",
+        2,
+        "https://x.example/b.png",
+    ),
+    # A JSON-escaped quote in a directive: the message shows the URL, not the backslash.
+    (
+        '%%{init: {"themeCSS": "@import \\"https://x.example/c.css\\";"}}%%\nflowchart LR\n  a --> b\n',
+        1,
+        "https://x.example/c.css",
+    ),
     # CSS: themeCSS in a directive or front matter, and style= in a label.
     (
         '%%{init: {"themeCSS": ".node rect { fill: url(https://x.example/f.png) }"}}%%\n'
