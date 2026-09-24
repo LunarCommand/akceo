@@ -3,9 +3,9 @@
 Build self-contained HTML slide decks from Markdown.
 
 You write slides in one Markdown file and run one command. You get a single HTML file with every
-image embedded in it. Large PNG, JPEG and WebP images are shrunk first, and Mermaid `.mmd`
-diagrams are drawn to SVG if you have the Mermaid CLI installed. The file has no external
-assets, so it opens straight from disk, works offline, and survives being emailed or copied
+image embedded in it. Large PNG, JPEG and WebP images are shrunk first. Mermaid `.mmd` diagrams
+are checked at build time and drawn when the page opens, with a copy of Mermaid that akceo
+includes, so there's nothing else to install. The file has no external assets, so it opens straight from disk, works offline, and survives being emailed or copied
 anywhere.
 
 ## Install
@@ -55,6 +55,7 @@ Build it:
 ```sh
 akceo build deck.md          # writes deck.html next to deck.md
 akceo build deck.md -o talk.html --theme paper
+akceo check deck.md          # runs every check, diagrams included, and writes nothing
 ```
 
 Open `deck.html` in a browser to present:

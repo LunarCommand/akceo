@@ -178,3 +178,16 @@ def test_an_unframed_image_is_bare_and_a_placeholder_is_unchanged():
     )
     assert '<img class="bare" src="data:x" alt="">' in html
     assert "bare" not in render_slide(parse("---\nlayout: image\n", Path("deck.md")).slides[0], "", False)
+
+
+def test_a_diagram_carries_its_escaped_source_for_the_page_to_draw():
+    slide = parse('---\nlayout: split\nimage: f.mmd\nimage-alt: A "b"\n\n## H\n', Path("deck.md")).slides[0]
+    framed = render_slide(slide, framed=True, diagram="flowchart LR\n  a --> b[<x> & y]\n")
+    assert (
+        '<div class="figwrap"><div class="diagram" role="img" aria-label="A &quot;b&quot;" '
+        'data-mermaid="default"><pre class="diagram-src">flowchart LR\n  a --&gt; b[&lt;x&gt; &amp; y]\n'
+        "</pre></div></div>"
+    ) in framed
+    assert "<img" not in framed
+    bare = render_slide(slide, framed=False, diagram="flowchart LR\n")
+    assert '<div class="diagram bare" role="img" aria-label="A &quot;b&quot;" data-mermaid="theme">' in bare

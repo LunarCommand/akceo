@@ -1,0 +1,4 @@
+# Vendored third-party code, left out of the language stats. The minified script is one
+# 5.6 MB line, so diffs show it as changed rather than printing it.
+src/akceo/assets/vendor/** linguist-vendored
+src/akceo/assets/vendor/mermaid/mermaid.min.js -diff

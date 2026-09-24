@@ -24,6 +24,10 @@ def _parser() -> argparse.ArgumentParser:
     build.add_argument("-o", "--out", type=Path, help="output file (default: the deck's name with .html)")
     build.add_argument("-t", "--theme", help="built-in theme name or path to a .css file (overrides theme:)")
 
+    check = commands.add_parser("check", help="check a deck, diagrams included, without writing a file")
+    check.add_argument("deck", type=Path, help="the deck's Markdown file")
+    check.add_argument("-t", "--theme", help="built-in theme name or path to a .css file (overrides theme:)")
+
     commands.add_parser("themes", help="list the built-in themes")
 
     viewer = commands.add_parser(
@@ -40,6 +44,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.command == "build":
             _build(args.deck, args.out, args.theme)
+        elif args.command == "check":
+            _check(args.deck, args.theme)
         elif args.command == "viewer":
             _write_viewer(args.out)
         else:
@@ -56,6 +62,12 @@ def _build(deck: Path, out: Path | None, theme: str | None) -> None:
     _write(out, page)
     noun = "slide" if count == 1 else "slides"
     print(f"wrote {out} ({out.stat().st_size / 1024:.0f} KB, {count} {noun})")
+
+
+def _check(deck: Path, theme: str | None) -> None:
+    _, count = render.build(deck, theme)
+    noun = "slide" if count == 1 else "slides"
+    print(f"ok: {deck} ({count} {noun})")
 
 
 def _write_viewer(out: Path) -> None:

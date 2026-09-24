@@ -133,13 +133,49 @@ The `split` and `image` layouts embed their image in the page.
   are never enlarged. JPEG and WebP are re-saved at quality 90 and turned upright using their
   EXIF orientation.
 - **SVG** is embedded unchanged.
-- **Mermaid** diagrams in a `.mmd` file are drawn as SVG at build time, then embedded. This
-  needs the Mermaid CLI, which is a separate install: `npm install -g @mermaid-js/mermaid-cli`.
-  Without it, a deck that uses a `.mmd` file stops with a message that says so. Each diagram adds
-  a few seconds to the build. A diagram that Mermaid can't draw stops the build with Mermaid's
-  own error message.
+- **Mermaid** diagrams in a `.mmd` file are drawn as SVG by the page when it opens. akceo
+  includes Mermaid, so nothing else needs installing. See [Mermaid diagrams](#mermaid-diagrams).
 
 Other formats stop the build.
+
+### Mermaid diagrams
+
+The build checks each diagram's syntax with Mermaid's own parser, so a mistake stops the build
+with Mermaid's message and the line in the `.mmd` file:
+
+```
+akceo: deck.md:40: slide 6: flow.mmd:3: Parse error: Expecting 'PE', 'TAGEND', ... got 'SQE'
+```
+
+`akceo check deck.md` runs the same checks without writing a file.
+
+A diagram can't load or link to anything outside the deck. Links may only point at a `#` anchor,
+such as `#5` for slide 5, and anything loaded must be a `data:` URI. A relative path counts as
+outside: it would point at a file next to `deck.html`, which is gone once the deck is copied. The
+build stops, naming the line, on:
+
+- links: `click` (including `href`), a class diagram's `link`, a sequence diagram's `link` and
+  `links`, C4's `$link=`, and `<a href=…>` in a label.
+- images: an image shape's `img:` (`b@{ img: … }`) and `src`, `srcset` and similar attributes
+  in label HTML.
+- CSS: `url(…)` and `@import`, whether in `themeCSS` in the front matter or an `%%{init}%%` line,
+  or in a `style=` in a label. `url(#id)`, which points inside the diagram, is fine.
+
+A URL that is only text in a label is fine. `%%` comments aren't checked.
+
+This check is there to give a clear message. The page itself carries a Content-Security-Policy that
+makes the browser refuse any outside load, so nothing the check misses can reach the network.
+
+A diagram longer than 50,000 characters stops the build too. That's Mermaid's limit: past it,
+Mermaid draws a notice instead of the diagram.
+
+The page then draws each diagram as inline SVG when it opens. A few mistakes only show up at
+that point, such as an invalid date in a `gantt` chart. Those don't stop the build. The slide
+shows Mermaid's message in place of the diagram.
+
+A deck with at least one diagram carries a copy of Mermaid, which adds about 5.6 MB to the
+file. A deck without diagrams doesn't. Mermaid's Font Awesome icons (`fa:fa-car`) don't show,
+because the page loads no outside stylesheets.
 
 ### Frames
 
@@ -188,6 +224,7 @@ the message lists the missing ones.
 | `--font` | Body font stack |
 | `--mono` | Code font stack |
 
-A comment on a theme's first line is its description in `akceo themes`. Fonts loaded from the
-web won't show when the deck is opened offline, so prefer fonts installed on the machine you
-present from.
+A comment on a theme's first line is its description in `akceo themes`. The page's
+Content-Security-Policy stops it loading anything from outside, so a web font or an `@import` in a
+theme never shows. Use fonts installed on the machine you present from, or embed one as a
+`data:` URI in an `@font-face` rule.
