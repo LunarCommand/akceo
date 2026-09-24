@@ -43,6 +43,20 @@ globalThis.structuredClone = function clone(value) {
   return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, clone(v)]));
 };
 
+// A click link's http(s) URL is tidied with new URL(). The check only needs that not to throw.
+globalThis.URL = class URL {
+  constructor(href) {
+    const m = /^([a-z][a-z0-9+.-]*:)\/\/([^/?#]*)(.*)$/i.exec(String(href));
+    if (!m) throw new TypeError("Invalid URL: " + href);
+    [, this.protocol, this.hostname, this.rest] = m;
+  }
+  get href() { return this.protocol + "//" + this.hostname + this.rest; }
+  toString() { return this.href; }
+  static canParse(href) {
+    try { new URL(href); return true; } catch (e) { return false; }
+  }
+};
+
 // Resolves to null when the diagram parses, or to Mermaid's error message when it doesn't.
 globalThis.akceoCheck = async (source) => {
   try {

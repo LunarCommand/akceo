@@ -14,8 +14,9 @@ All notable changes to this project are documented here. The format follows
 - PNG, JPEG and WebP images are shrunk and embedded; SVG is embedded as-is.
 - Mermaid diagrams: `image: flow.mmd` is drawn as SVG when the page opens. akceo includes
   Mermaid, so there's nothing else to install. The build checks each diagram with Mermaid's own
-  parser and stops on a syntax error, naming the line in the `.mmd` file. A deck with a diagram
-  grows by about 5.6 MB.
+  parser and stops on a syntax error, naming the line in the `.mmd` file. It also stops on a
+  diagram that would load or link to anything outside the deck. A deck with a diagram grows by
+  about 5.6 MB.
 - `akceo check deck.md` runs every check a build runs, diagrams included, without writing a file.
 - `image-frame: no`, for the whole deck or one slide, drops the white panel behind images.
   Mermaid diagrams without a frame are drawn in the deck theme's colors.

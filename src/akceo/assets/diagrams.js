@@ -13,6 +13,15 @@
     svg.setAttribute('width', Math.round(box.width));
     svg.setAttribute('height', Math.round(box.height));
     svg.style.maxWidth = '';
+    // The build rejects diagrams that load or link to anything outside the deck. Should one slip
+    // through, drop the reference so the page stays self-contained.
+    svg.querySelectorAll('*').forEach(function(el) {
+      Array.prototype.slice.call(el.attributes).forEach(function(attr) {
+        if (/^(xlink:)?href$|^src$/i.test(attr.name) && !/^\s*(#|data:)/i.test(attr.value)) {
+          el.removeAttributeNode(attr);
+        }
+      });
+    });
     node.classList.forEach(function(name){ svg.classList.add(name); });
     svg.setAttribute('role', 'img');
     svg.setAttribute('aria-label', node.getAttribute('aria-label'));
@@ -26,6 +35,9 @@
     return mermaid.render('diagram-' + n, source).then(function(result) {
       node.replaceWith(sized(result.svg, node));
     }, function(e) {
+      // The image role and its label would hide this text from screen readers.
+      node.removeAttribute('role');
+      node.removeAttribute('aria-label');
       node.classList.add('failed');
       node.textContent = 'Mermaid could not draw this diagram: ' + ((e && e.message) || e);
     });

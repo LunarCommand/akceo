@@ -1,6 +1,7 @@
 {
   "version": "12.0.0",
   "source": "https://registry.npmjs.org/mermaid/-/mermaid-12.0.0.tgz",
+  "lockfile": "https://raw.githubusercontent.com/mermaid-js/mermaid/mermaid%4012.0.0/pnpm-lock.yaml",
   "integrity": "sha512-/wQXC9iBxoGV8p3erbvaXs9h77VyLDBH6GdayVjj3hEcSQhFU4N1WUhUppotCEqlIxI2pRMwjwBSwTB1MfZBgQ==",
   "sha256": "1eb067b8570a39c2702a681fdf141b808fb2914f24246287da1c2bfd4a3890e6",
   "escaped_control_characters": 1

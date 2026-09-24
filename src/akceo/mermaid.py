@@ -26,6 +26,12 @@ FRONT_MATTER = re.compile(r"([^\S\n\r]*)-{3}\s*[\n\r](.*?)[\n\r]\1-{3}\s*[\n\r]+
 DIRECTIVE = re.compile(r"%%\{\s*(?:(\w+)\s*:|(\w+))\s*(?:(\w+)|((?:(?!\}%%).|\r?\n)*))?\s*(?:\}%%)?", re.I)
 COMMENT = re.compile(r"^\s*%%(?!\{)[^\n]+\n?", re.MULTILINE)
 
+# Ways a diagram can point outside the deck: a click link, an image shape's img:, and src or href
+# in HTML inside a label. Mermaid fetches images while it draws, so these are stopped at build time.
+CLICK_URL = re.compile(r"""^\s*click\s+\S+\s+(?:href\s+)?["']([^"']*)["']""")
+IMAGE_SHAPE = re.compile(r"""(?:^|[{,])\s*img\s*:\s*["']?([^"',}\s]*)""")
+HTML_URL = re.compile(r"""<[a-z][^>]*?\b(src|href)\s*=\s*["']?([^"'\s>]*)""", re.IGNORECASE)
+
 LINE_REF = re.compile(r"\bline (\d+)")
 JISON_ERROR = re.compile(r"(Parse|Lexical) error on line (\d+)[:.]?\s*(.*)", re.DOTALL)
 UNKNOWN_TYPE = "No diagram type detected"
@@ -65,14 +71,42 @@ class Checker:
             raise DeckError(f"{path}: Mermaid took over {PARSE_TIMEOUT}s to check the diagram") from None
         if isinstance(message, str):
             raise DeckError(explain(path, source, message))
+        outside = outside_reference(source)
+        if outside:
+            line, url = outside
+            raise DeckError(
+                f"{path}:{line}: a diagram can't load or link to anything outside the deck ({url}); "
+                "use a data: URI for an image and a #anchor, such as #3 for slide 3, for a link"
+            )
+
+
+def outside_reference(source: str) -> tuple[int, str] | None:
+    """The first line and URL where the diagram links to, or loads, something outside the page.
+    Images may only be data: URIs and links only #anchors: a relative path would point next to
+    deck.html and break once the deck is copied. A URL that is only text in a label is fine."""
+    for number, line in enumerate(source.splitlines(), 1):
+        if line.lstrip().startswith("%%"):
+            continue
+        links = [m.group(1) for m in CLICK_URL.finditer(line)]
+        images = [m.group(1) for m in IMAGE_SHAPE.finditer(line)]
+        for m in HTML_URL.finditer(line):
+            (links if m.group(1).lower() == "href" else images).append(m.group(2))
+        for url in links:
+            if url and not url.startswith("#"):
+                return number, url
+        for url in images:
+            if url and not url.lower().startswith("data:"):
+                return number, url
+    return None
 
 
 def explain(path: Path, source: str, message: str) -> str:
     """Turn a Mermaid parse error into one line that points at the line in the diagram file."""
     origin = _origin_lines(source)
     if message.startswith(UNKNOWN_TYPE):
-        first = next((n for n, text in enumerate(source.splitlines(), 1) if text.strip()), 1)
-        return f"{path}:{first}: Mermaid doesn't recognise the diagram type; start with one such as flowchart"
+        # Mermaid reads the type from the first line it parses.
+        hint = "start with one such as flowchart"
+        return f"{path}:{origin(1)}: Mermaid doesn't recognise the diagram type; {hint}"
     jison = JISON_ERROR.match(message)
     if jison:
         kind, line, rest = jison.groups()

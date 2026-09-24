@@ -7,13 +7,16 @@ package. akceo uses it twice:
   diagram, so syntax errors stop the build.
 - In the built page, it draws each diagram as inline SVG when the deck opens.
 
-`manifest.json` records the version, the tarball it came from, npm's integrity hash and the SHA-256
-of the file here. A test checks the file against that SHA-256.
+`manifest.json` records the version, the tarball it came from, npm's integrity hash, the lockfile
+the notices come from, and the SHA-256 of the file here. A test checks the file against that SHA-256.
 
 ## Licenses
 
 Mermaid is MIT licensed; see `LICENSE`. The file also bundles other packages, listed with their
-license texts in `THIRD_PARTY_NOTICES`. One of them, elkjs, is EPL-2.0, which asks that recipients
+license texts in `THIRD_PARTY_NOTICES`. The list comes from `pnpm-lock.yaml` in Mermaid's repository
+at the release tag, the lockfile the bundle was built from, so each version matches the bundle. It
+covers Mermaid's production dependencies, plus the devDependencies that its workspace packages
+(`@mermaid-js/parser`) compile into their own output, such as langium. One of them, elkjs, is EPL-2.0, which asks that recipients
 be told where its source is: https://github.com/kieler/elkjs. Every built deck that has a diagram
 carries a comment saying so.
 
@@ -26,12 +29,15 @@ that the packaged assets carry none. `manifest.json` records how many were escap
 ## Updating
 
 ```sh
-uv run python scripts/update_mermaid.py 12.0.0   # the new version; needs npm for the notices
+uv run python scripts/update_mermaid.py 12.0.0   # the new version
 uv run pytest
 ```
 
 The script downloads the tarball, checks it against npm's integrity hash, applies the change above
-and rewrites every file in this folder. Then run the full test suite: `tests/test_mermaid.py` runs
+and rewrites every file in this folder. For the notices it downloads each locked package and checks
+it against the lockfile's integrity hash. If a workspace package has a devDependency the script
+hasn't seen, it stops: check whether that package ends up in `mermaid.min.js`, then add it to
+`BUNDLED_DEV_DEPENDENCIES` or `BUILD_ONLY_DEV_DEPENDENCIES` in the script. Then run the full test suite: `tests/test_mermaid.py` runs
 the real parser, so a Mermaid release that no longer works with the stand-ins in
 `assets/mermaid-shims.js` fails there. Build `examples/demo/deck.md` and look at the diagram slide
 too, since drawing isn't covered by the tests.

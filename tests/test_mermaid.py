@@ -37,6 +37,11 @@ def error(checker: Checker, source: str) -> str:
         "classDiagram\n  A <|-- B\n",
         "stateDiagram-v2\n  [*] --> A\n",
         "%%{init: {'theme': 'base'}}%%\nflowchart LR\n  a --> b\n",
+        # Links to a slide, data: images and URLs that are only text keep the deck self-contained.
+        'flowchart LR\n  a --> b\n  click a "#5" "Go to slide 5"\n',
+        'flowchart LR\n  b@{ img: "data:image/png;base64,AAAA", label: "L" }\n',
+        'flowchart LR\n  a["see https://example.com"] --> b\n',
+        'flowchart LR\n  %% click a href "https://example.com"\n  a --> b\n',
     ],
 )
 def test_valid_diagrams_pass(checker: Checker, source: str):
@@ -72,9 +77,49 @@ def test_errors_from_the_newer_parser_name_the_line(checker: Checker):
     )
 
 
-def test_an_unknown_diagram_type(checker: Checker):
-    assert error(checker, "\n\nflowchrt LR\n  a --> b\n") == (
-        "flow.mmd:3: Mermaid doesn't recognise the diagram type; start with one such as flowchart"
+@pytest.mark.parametrize(
+    ("source", "line"),
+    [
+        ("\n\nflowchrt LR\n  a --> b\n", 3),
+        ("%% comment\nflowchrt LR\n", 2),
+        ("---\ntitle: T\n---\nflowchrt LR\n", 4),
+        ("%%{init: {'theme': 'base'}}%%\nflowchrt LR\n", 2),
+    ],
+)
+def test_an_unknown_diagram_type_names_the_line_it_is_on(checker: Checker, source: str, line: int):
+    assert error(checker, source) == (
+        f"flow.mmd:{line}: Mermaid doesn't recognise the diagram type; start with one such as flowchart"
+    )
+
+
+@pytest.mark.parametrize(
+    ("source", "line", "url"),
+    [
+        # The http(s) URL also needs the URL stand-in; without it the check crashed.
+        (
+            'flowchart LR\n  a --> b\n  click a href "https://example.com/docs"\n',
+            3,
+            "https://example.com/docs",
+        ),
+        ('flowchart LR\n  a --> b\n  click a "https://example.com" "tip" _blank\n', 3, "https://example.com"),
+        (
+            'flowchart LR\n  a --> b\n  b@{ img: "https://example.com/x.png", label: "L" }\n',
+            3,
+            "https://example.com/x.png",
+        ),
+        ('flowchart LR\n  b@{\n    label: "L"\n    img: "pic.png"\n  }\n', 4, "pic.png"),
+        (
+            "flowchart LR\n  a --> c[\"<img src='https://example.com/l.png'/> L\"]\n",
+            2,
+            "https://example.com/l.png",
+        ),
+        ("flowchart LR\n  a --> c[\"<a href='https://x.com'>x</a>\"]\n", 2, "https://x.com"),
+    ],
+)
+def test_diagrams_cant_load_or_link_outside_the_deck(checker: Checker, source: str, line: int, url: str):
+    assert error(checker, source) == (
+        f"flow.mmd:{line}: a diagram can't load or link to anything outside the deck ({url}); "
+        "use a data: URI for an image and a #anchor, such as #3 for slide 3, for a link"
     )
 
 

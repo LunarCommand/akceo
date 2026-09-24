@@ -371,11 +371,16 @@ A `.mmd` diagram is checked at build time and drawn in the browser.
 
 The check loads `mermaid.min.js` into V8 through mini-racer and calls Mermaid's own `parse()`.
 Mermaid expects a browser, so `assets/mermaid-shims.js` is loaded first. It stands in for the
-three things `parse()` touches: DOMPurify's hooks, `TextEncoder` and `structuredClone`. Mermaid
+things `parse()` touches: DOMPurify's hooks, `TextEncoder`, `structuredClone` and `URL`. Mermaid
 drops front matter, `%%{init}%%` lines, `%%` comments and leading blank lines before parsing,
 so the line in its errors counts without them. `mermaid.py` repeats those steps, keeping each
 character's original line, to report the line in the file. One V8 context serves the whole
 build, and it's closed at the end; an open context stops Python from exiting.
+
+A diagram that parses is then scanned for references outside the deck: `click` links, image
+shapes and `src` or `href` in label HTML. Only `#` anchors and `data:` URIs pass. This has to
+happen at build time, because Mermaid fetches images while it draws. `diagrams.js` also strips
+any other `href` or `src` from the drawn SVG, as a backstop.
 
 The page gets the vendored Mermaid, under a comment that carries its license and the notices of
 every package it bundles, then the theme's Mermaid config as JSON, then `diagrams.js`. That

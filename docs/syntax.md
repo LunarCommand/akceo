@@ -149,6 +149,15 @@ akceo: deck.md:40: slide 6: flow.mmd:3: Parse error: Expecting 'PE', 'TAGEND', .
 
 `akceo check deck.md` runs the same checks without writing a file.
 
+A diagram can't load or link to anything outside the deck, so the build stops on:
+
+- a `click` link to anything but a `#` anchor. `click a "#5"` links to slide 5.
+- an image shape (`b@{ img: … }`) or an `<img src=…>` in a label whose source isn't a `data:` URI.
+  A relative path counts as outside: it would point at a file next to `deck.html`, which is gone
+  once the deck is copied.
+
+A URL that is only text in a label is fine.
+
 The page then draws each diagram as inline SVG when it opens. A few mistakes only show up at
 that point, such as an invalid date in a `gantt` chart. Those don't stop the build. The slide
 shows Mermaid's message in place of the diagram.
