@@ -1,3 +1,7 @@
+# The vendored Mermaid is kept byte for byte as scripts/update_mermaid.py writes it, and a test
+# checks its SHA-256, so the file hooks must leave it alone.
+exclude: ^src/akceo/assets/vendor/
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
