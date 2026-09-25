@@ -5,12 +5,20 @@ Build self-contained HTML slide decks from Markdown.
 You write slides in one Markdown file and run one command. You get a single HTML file with every
 image embedded in it. Large PNG, JPEG and WebP images are shrunk first. Mermaid `.mmd` diagrams
 are checked at build time and drawn when the page opens, with a copy of Mermaid that akceo
-includes, so there's nothing else to install. The file has no external assets, so it opens straight from disk, works offline, and survives being emailed or copied
-anywhere.
+includes, so there's nothing else to install. The file has no external assets, so it opens
+straight from disk, works offline, and survives being emailed or copied anywhere.
 
 ## Install
 
-Needs Python 3.12 or newer and [uv](https://docs.astral.sh/uv/).
+Needs Python 3.12 or newer. Install the `akceo` command from PyPI with
+[uv](https://docs.astral.sh/uv/) or [pipx](https://pipx.pypa.io/):
+
+```sh
+uv tool install akceo
+pipx install akceo
+```
+
+To try changes that aren't released yet, install from the repository instead:
 
 ```sh
 uv tool install git+https://github.com/LunarCommand/akceo
@@ -133,6 +141,9 @@ uv run ruff check . && uv run ruff format --check .
 uv run pyright
 uv run pre-commit install   # optional: run these checks on every commit
 ```
+
+Releases are published to PyPI by pushing a version tag; [docs/RELEASING.md](docs/RELEASING.md)
+has the steps.
 
 ## Branding
 

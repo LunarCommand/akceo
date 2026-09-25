@@ -7,6 +7,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Published on PyPI: `uv tool install akceo` or `pipx install akceo`.
 - `akceo build` renders a Markdown deck into one self-contained HTML file.
 - `akceo themes` lists the built-in themes.
 - Six layouts: `title`, `bullets`, `split`, `steps`, `table` and `image`.
