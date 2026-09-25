@@ -54,7 +54,8 @@ that version's section of `CHANGELOG.md`.
    before tagging.
 
 6. **The workflow does the rest:**
-   - checks that the tag matches `pyproject.toml` and that `CHANGELOG.md` has a section for it
+   - checks that the tag matches `pyproject.toml` and that `CHANGELOG.md` has a section for it,
+     dated within a day of the tag
    - runs ruff, pyright and pytest
    - builds the sdist and the wheel
    - publishes both to PyPI, waiting for approval if the `pypi` environment requires it
@@ -81,7 +82,12 @@ GitHub. A tag created only locally does nothing.
 (`git tag -d v0.2.0 && git push origin :refs/tags/v0.2.0`), fix the version on `main`, and tag
 again.
 
-**"CHANGELOG.md has no '## [0.2.0] - <date>' section".** Step 3 was missed. Same fix as above.
+**"CHANGELOG.md has no '## [0.2.0] - YYYY-MM-DD' heading".** Step 3 was missed, or the heading
+isn't exactly that form. Same fix as above.
+
+**"the 0.2.0 heading is dated …; date it the day you tag".** The changelog date has to be the
+release day, give or take one day for time zones. Fix the date on `main`, delete the tag and tag
+again.
 
 **The publish step fails.** Check that the PyPI trusted publisher's owner, repository, workflow file
 and environment exactly match the values in the setup table, and that the `pypi` environment exists.

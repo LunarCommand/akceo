@@ -10,15 +10,7 @@ straight from disk, works offline, and survives being emailed or copied anywhere
 
 ## Install
 
-Needs Python 3.12 or newer. Install the `akceo` command from PyPI with
-[uv](https://docs.astral.sh/uv/) or [pipx](https://pipx.pypa.io/):
-
-```sh
-uv tool install akceo
-pipx install akceo
-```
-
-To try changes that aren't released yet, install from the repository instead:
+Needs Python 3.12 or newer and [uv](https://docs.astral.sh/uv/).
 
 ```sh
 uv tool install git+https://github.com/LunarCommand/akceo
