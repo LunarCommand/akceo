@@ -5,6 +5,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-24
+
+The first release.
+
 ### Added
 
 - Published on PyPI: `uv tool install akceo` or `pipx install akceo`.
@@ -19,9 +23,12 @@ All notable changes to this project are documented here. The format follows
   diagram that would load or link to anything outside the deck, and on one longer than Mermaid's
   50,000-character limit. A deck with a diagram grows by about 5.6 MB.
 - The built page carries a Content-Security-Policy, so the browser refuses to load anything from
-  outside the file. A web font or `@import` in a custom theme no longer loads; use installed
-  fonts, or embed one as a `data:` URI.
+  outside the file. A web font or `@import` in a custom theme doesn't load; use installed fonts,
+  or embed one as a `data:` URI.
 - `akceo check deck.md` runs every check a build runs, diagrams included, without writing a file.
+- Per-slide style overrides: `style-h1`, `style-h2`, `style-lead`, `style-ul`, `style-ol` and
+  `style-sub` add inline CSS to that element, for one-off spacing fixes. They can't reference
+  files or URLs.
 - `image-frame: no`, for the whole deck or one slide, drops the white panel behind images.
   Mermaid diagrams without a frame are drawn in the deck theme's colors.
 - Deck errors name the file, line and slide; theme and image errors name the file. Content a

@@ -68,7 +68,7 @@ kicker: Getting started
 
 Install once. After that it's a write, build, present loop.
 
-1. Install: `uv tool install git+https://github.com/LunarCommand/akceo`
+1. Install: `uv tool install akceo`
 2. Write `deck.md`: a config block, then slides separated by `---`.
 3. Build: `akceo build deck.md`
 4. Present: open `deck.html` and use the arrow keys.
