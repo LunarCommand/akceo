@@ -17,6 +17,7 @@ license-files = [
     "src/akceo/assets/vendor/mermaid/LICENSE",
     "src/akceo/assets/vendor/mermaid/THIRD_PARTY_NOTICES",
 ]
+keywords = ["slides", "presentation", "markdown", "html", "mermaid", "cli"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
@@ -24,6 +25,8 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Multimedia :: Graphics :: Presentation",
 ]
 dependencies = [
@@ -33,6 +36,9 @@ dependencies = [
 
 [project.urls]
 Repository = "https://github.com/LunarCommand/akceo"
+Documentation = "https://github.com/LunarCommand/akceo/blob/main/docs/syntax.md"
+Changelog = "https://github.com/LunarCommand/akceo/blob/main/CHANGELOG.md"
+Issues = "https://github.com/LunarCommand/akceo/issues"
 
 [project.scripts]
 akceo = "akceo.cli:main"
@@ -47,6 +53,22 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/akceo"]
+
+# Listed, not left to .gitignore: files kept out of git some other way, such as through
+# .git/info/exclude, would otherwise land in an sdist built from a working copy.
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
+    "/docs",
+    "/examples",
+    "/scripts",
+    "/CHANGELOG.md",
+    "/README.md",
+    "/LICENSE",
+    "/pyproject.toml",
+    "/uv.lock",
+]
 
 [tool.pyright]
 include = ["src", "tests"]

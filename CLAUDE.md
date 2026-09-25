@@ -25,7 +25,10 @@ dependencies are Pillow (images) and mini-racer (V8, to check Mermaid diagrams a
 - `examples/demo/`: a deck that uses every layout, and its speaker notes. The end-to-end test
   builds the deck.
 - `docs/`: `syntax.md` (format reference), `speaker-notes.md` (notes setup), `how-it-works.md`
-  (design, with Mermaid diagrams), `branding.md`.
+  (design, with Mermaid diagrams), `branding.md`, `RELEASING.md` (how a tag becomes a PyPI
+  release).
+- `.github/workflows/`: `ci.yml` (checks on every push and PR) and `release.yml` (a `v*.*.*` tag
+  publishes to PyPI and creates the GitHub Release).
 
 ## Commands
 
