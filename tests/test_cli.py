@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
+from akceo import render
 from akceo.cli import main
 
 ROOT = Path(__file__).parents[1]
@@ -116,6 +117,27 @@ def test_diagram_frames_pick_the_colors(tmp_path: Path):
 def test_errors_exit_1_with_a_message(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     assert main(["build", str(tmp_path / "missing.md")]) == 1
     assert capsys.readouterr().err == f"akceo: {tmp_path / 'missing.md'}: no such file\n"
+
+
+def test_ctrl_c_exits_130_with_one_line(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+):
+    # Without the KeyboardInterrupt branch in main, the interrupt escapes, and pytest would
+    # stop the whole run on it; catching it here turns that into this test failing.
+    def interrupted(*args: object) -> tuple[str, int]:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(render, "build", interrupted)
+    deck = tmp_path / "deck.md"
+    deck.write_text("---\n## One\n")
+    for command in (["build", str(deck)], ["check", str(deck)]):
+        try:
+            code = main(command)
+        except KeyboardInterrupt:
+            pytest.fail("main let Ctrl-C escape")
+        assert code == 130
+        assert capsys.readouterr() == ("", "akceo: interrupted\n")
+    assert not (tmp_path / "deck.html").exists()
 
 
 def test_image_errors_name_the_slide(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
