@@ -183,7 +183,19 @@ def render_slide(slide: Slide, image_src: str = "", framed: bool = True, diagram
     h2 = f"<h2{_style(slide, 'h2')}>{inline(_text(slide, 'h2'))}</h2>"
 
     if slide.layout == "image":
-        out.append(f'    <div class="figure-full">{_figure(slide, image_src, framed, diagram)}</div>')
+        if slide.first("h2"):
+            out.append(f"    {h2}")
+        figure = f'<div class="figure-full">{_figure(slide, image_src, framed, diagram)}</div>'
+        para = slide.first("para")
+        if para:
+            # The figure holds the image and its caption together, so the caption stays under the image.
+            caption = f'<figcaption class="caption"{_style(slide, "sub")}>{inline(para.text)}</figcaption>'
+            out.append('    <figure class="captioned">')
+            out.append(f"      {figure}")
+            out.append(f"      {caption}")
+            out.append("    </figure>")
+        else:
+            out.append(f"    {figure}")
 
     elif slide.layout == "split":
         wide = " img-wide" if slide.flag("image-wide") else ""

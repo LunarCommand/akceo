@@ -5,6 +5,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The `image` layout takes an optional `##` heading above the image and a paragraph under it,
+  shown as a caption. `style-h2` and `style-sub` apply to them.
+
 ## [0.1.0] - 2026-09-24
 
 The first release.

@@ -167,6 +167,37 @@ def test_image_slide_keeps_the_kicker_at_the_top():
     )
 
 
+def test_image_slide_puts_its_heading_above_the_image_and_its_caption_below():
+    html = slide_html(
+        "layout: image\nkicker: K\nimage: x.png\n\n## Results\n\nPer **region**, after the fix.\n",
+        image_src="data:x",
+    )
+    assert html == "\n".join(
+        [
+            '  <section class="slide">',
+            '    <div class="kicker">K</div>',
+            "    <h2>Results</h2>",
+            '    <figure class="captioned">',
+            '      <div class="figure-full"><img src="data:x" alt=""></div>',
+            '      <figcaption class="caption">Per <b>region</b>, after the fix.</figcaption>',
+            "    </figure>",
+            "  </section>",
+        ]
+    )
+
+
+def test_image_slide_caption_takes_the_paragraph_style():
+    html = slide_html("layout: image\nstyle-h2: color:red\nstyle-sub: font-size:3vw\n\n## H\n\nC\n")
+    assert '<h2 style="color:red">H</h2>' in html
+    assert '<figcaption class="caption" style="font-size:3vw">C</figcaption>' in html
+
+
+def test_image_slide_with_a_caption_and_no_image_keeps_the_placeholder():
+    html = slide_html("layout: image\n\nTo come.\n")
+    assert '<div class="figure-full"><div class="placeholder"></div></div>' in html
+    assert '<figcaption class="caption">To come.</figcaption>' in html
+
+
 def test_image_slide_without_an_image_shows_a_placeholder():
     html = slide_html("layout: image\n")
     assert '<div class="figure-full"><div class="placeholder"></div></div>' in html

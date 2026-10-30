@@ -57,7 +57,7 @@ A slide starts with `key: value` header lines. Then comes a blank line, then the
 | `image-wide` | split | `yes` gives the image the wider column. |
 | `image-frame` | split, image | `yes` or `no` for this slide's image, overriding the deck's `image-frame`. |
 | `dim-last-column` | table | `yes` shows the last column in muted text. |
-| `style-h1`, `style-h2`, `style-lead`, `style-ul`, `style-ol`, `style-sub` | all | Inline CSS for that element, for one-off spacing fixes. `style-sub` applies to the paragraph. It can't reference files or URLs. |
+| `style-h1`, `style-h2`, `style-lead`, `style-ul`, `style-ol`, `style-sub` | all | Inline CSS for that element, for one-off spacing fixes. `style-sub` applies to the paragraph, which is the caption on an `image` slide. It can't reference files or URLs. |
 
 ### Layouts
 
@@ -68,10 +68,11 @@ A slide starts with `key: value` header lines. Then comes a blank line, then the
 | `split` | An image left, text right | `##` heading, any number of `###` phases and `-` lists, one `*note*` | `##` heading |
 | `steps` | A numbered sequence | `##` heading, paragraph, `1.` list | `##` heading, `1.` list |
 | `table` | A table | `##` heading, `\|` table | `##` heading, `\|` table |
-| `image` | An image filling the slide, the kicker top left | nothing | nothing |
+| `image` | An image filling the slide, with an optional heading above it and caption below it | `##` heading, paragraph | nothing |
 
 Each kind of content may appear once per slide. In the `split` layout, phases and lists may
-repeat and render in the order written. There, the note always renders last.
+repeat and render in the order written. There, the note always renders last. In the `image`
+layout, the paragraph is a caption: smaller muted text, centered under the image.
 
 ## Blocks
 

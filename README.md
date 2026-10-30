@@ -92,7 +92,7 @@ stays on the slide you were on.
 | `split` | A diagram with commentary | image, `##` heading, phases, lists, note |
 | `steps` | A sequence | `##` heading, paragraph, numbered list |
 | `table` | Comparisons | `##` heading, table |
-| `image` | A diagram on its own | image, kicker |
+| `image` | A diagram on its own | image, kicker, `##` heading, caption |
 
 The full format is in [docs/syntax.md](docs/syntax.md). It covers config keys, slide keys, blocks
 and inline markup.

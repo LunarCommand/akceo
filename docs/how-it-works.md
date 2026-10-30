@@ -98,7 +98,7 @@ kicker: The problem
 ```
 
 There are six layouts: `title`, `bullets`, `split` (image beside text), `steps`, `table` and
-`image` (an image on its own).
+`image` (an image on its own, with an optional heading and caption).
 The inline marks are small: bold, a strong color, an accent color, dimmed asides and code.
 
 ### Building

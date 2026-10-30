@@ -32,7 +32,14 @@ code { font-family: var(--mono); color: var(--accent2); font-size: .92em; }
                border-radius: 10px; }
 .figure-full { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
 .figure-full .placeholder { width: auto; height: 100%; max-width: 100%; }
-.kicker + .figure-full { margin-top: 2vh; }
+.kicker + .figure-full, .kicker + .captioned { margin-top: 2vh; }
+/* The image's row grows to the image's own height, or as far as the caption leaves room for, and the
+   pair is centered together. A placeholder has no height of its own, so it takes the whole row. */
+.captioned { flex: 1; min-height: 0; display: grid; grid-template-rows: minmax(0, max-content) max-content;
+             align-content: center; }
+.captioned:has(.placeholder) { grid-template-rows: minmax(0, 1fr) max-content; }
+.caption { color: var(--muted); font-size: clamp(14px, 1.6vw, 20px); line-height: 1.45; text-align: center;
+           max-width: 70ch; margin: 2.2vh auto 0; }
 .figwrap img.bare, .figure-full img.bare,
 .figwrap svg.bare, .figure-full svg.bare { background: none; box-shadow: none; padding: 0; border-radius: 0; }
 /* A diagram's source waits hidden until the page script draws it as an <svg class="diagram">. */
