@@ -22,13 +22,14 @@ dependencies are Pillow (images) and mini-racer (V8, to check Mermaid diagrams a
   `scripts/update_mermaid.py` (see the README there).
 - `src/akceo/themes/`: built-in themes, one CSS file each. The first-line comment is the
   description `akceo themes` prints.
-- `examples/demo/`: a deck that uses every layout, and its speaker notes. The end-to-end test
-  builds the deck.
+- `examples/demo/`: a deck that uses every layout, its speaker notes, and `deck.html`, the deck
+  built. The end-to-end test builds the deck.
 - `docs/`: `syntax.md` (format reference), `speaker-notes.md` (notes setup), `how-it-works.md`
   (design, with Mermaid diagrams), `branding.md`, `RELEASING.md` (how a tag becomes a PyPI
   release).
-- `.github/workflows/`: `ci.yml` (checks on every push and PR) and `release.yml` (a `v*.*.*` tag
-  publishes to PyPI and creates the GitHub Release).
+- `.github/workflows/`: `ci.yml` (checks on every push and PR), `release.yml` (a `v*.*.*` tag
+  publishes to PyPI and creates the GitHub Release) and `pages.yml` (publishes the built demo to
+  <https://lunarcommand.github.io/akceo/> when it changes on main).
 
 ## Commands
 
@@ -54,3 +55,6 @@ uv run akceo check examples/demo/deck.md
 - The page carries Mermaid packed, and the whole page must pass the external-reference test.
   Mermaid itself, unpacked, has its own narrower check.
 - Keep the `Unreleased` section of `CHANGELOG.md` current.
+- `examples/demo/deck.html` is committed. Rebuild it with `uv run akceo build examples/demo/deck.md`
+  after any change to the page: the demo, the assets, the `midnight` theme, the renderer, or
+  Mermaid. A test fails while it is out of date.

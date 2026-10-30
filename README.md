@@ -80,8 +80,9 @@ A click while text is selected doesn't change slides, so you can copy text from 
 The address bar shows the current slide as `#N`, so `deck.html#4` opens on slide 4 and a reload
 stays on the slide you were on.
 
-`examples/demo/deck.md` uses every layout and markup feature. Build it with
-`akceo build examples/demo/deck.md`.
+`examples/demo/deck.md` uses every layout and markup feature. See it built at
+<https://lunarcommand.github.io/akceo/>. The same file is `examples/demo/deck.html`, which opens
+straight from disk too. Build it yourself with `akceo build examples/demo/deck.md`.
 
 ## Layouts
 

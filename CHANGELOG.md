@@ -9,6 +9,8 @@ All notable changes to this project are documented here. The format follows
 
 - The `image` layout takes an optional `##` heading above the image and a paragraph under it,
   shown as a caption. `style-h2` and `style-sub` apply to them.
+- The demo deck, built, is online at <https://lunarcommand.github.io/akceo/> and kept in the
+  repository as `examples/demo/deck.html`, so you can see akceo's output without installing it.
 
 ### Changed
 

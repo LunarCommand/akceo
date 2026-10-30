@@ -49,8 +49,17 @@ def test_builds_the_demo_deck_self_contained(tmp_path: Path, capsys: pytest.Capt
     assert "Author note" not in page
 
 
+def test_the_committed_demo_build_is_current(tmp_path: Path):
+    out = tmp_path / "demo.html"
+    assert main(["build", str(DEMO / "deck.md"), "-o", str(out)]) == 0
+    committed = DEMO / "deck.html"
+    # Compared without assert ==, whose diff of a page this size would swamp the message.
+    if not committed.is_file() or unpacked(out.read_text()) != unpacked(committed.read_text()):
+        pytest.fail("examples/demo/deck.html is out of date: uv run akceo build examples/demo/deck.md")
+
+
 def test_default_output_sits_next_to_the_deck(tmp_path: Path):
-    shutil.copytree(DEMO, tmp_path / "demo")
+    shutil.copytree(DEMO, tmp_path / "demo", ignore=shutil.ignore_patterns("*.html"))
     assert main(["build", str(tmp_path / "demo" / "deck.md")]) == 0
     assert (tmp_path / "demo" / "deck.html").is_file()
 
