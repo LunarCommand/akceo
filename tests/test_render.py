@@ -194,6 +194,7 @@ def test_image_slide_caption_takes_the_paragraph_style():
 
 def test_image_slide_with_a_caption_and_no_image_keeps_the_placeholder():
     html = slide_html("layout: image\n\nTo come.\n")
+    assert '<figure class="captioned empty">' in html
     assert '<div class="figure-full"><div class="placeholder"></div></div>' in html
     assert '<figcaption class="caption">To come.</figcaption>' in html
 

@@ -190,8 +190,10 @@ def render_slide(slide: Slide, image_src: str = "", framed: bool = True, diagram
         para = slide.first("para")
         if para:
             # The figure holds the image and its caption together, so the caption stays under the image.
+            # Without an image the figure holds the dashed placeholder, and the empty class sizes it.
             caption = f'<figcaption class="caption"{_style(slide, "sub")}>{inline(para.text)}</figcaption>'
-            out.append('    <figure class="captioned">')
+            empty = "" if "image" in slide.meta else " empty"
+            out.append(f'    <figure class="captioned{empty}">')
             out.append(f"      {figure}")
             out.append(f"      {caption}")
             out.append("    </figure>")

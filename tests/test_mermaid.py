@@ -310,5 +310,5 @@ def test_packed_unpacks_to_the_vendored_script():
     packed = mermaid.packed()
     script = (mermaid.VENDOR / "mermaid.min.js").read_bytes()
     assert re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", packed)
-    assert zlib.decompress(base64.b64decode(packed), -15) == script
+    assert zlib.decompress(base64.b64decode(packed)) == script
     assert len(packed) < len(script) / 2

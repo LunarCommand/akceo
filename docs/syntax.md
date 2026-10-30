@@ -175,10 +175,10 @@ that point, such as an invalid date in a `gantt` chart. Those don't stop the bui
 shows Mermaid's message in place of the diagram.
 
 A deck with at least one diagram carries a compressed copy of Mermaid, which adds about 2.4 MB
-to the file. A deck without diagrams doesn't. The page unpacks Mermaid when it opens, which
-needs Chrome or Edge 80, Firefox 113 or Safari 16.4, or newer. In an older browser, each diagram
-shows a message in its place. Mermaid's Font Awesome icons (`fa:fa-car`) don't show, because the
-page loads no outside stylesheets.
+to the file. A deck without diagrams doesn't. The page unpacks Mermaid when it opens. Unpacking
+and Mermaid itself together need Chrome or Edge 98, Firefox 113 or Safari 16.4, or newer. In an
+older browser, each diagram shows a message in its place. Mermaid's Font Awesome icons
+(`fa:fa-car`) don't show, because the page loads no outside stylesheets.
 
 ### Frames
 

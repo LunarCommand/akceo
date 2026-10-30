@@ -27,7 +27,7 @@ OUTSIDE_LOAD = re.compile(r"""(src|href)=["']?(https?:|//)|(url\(|@import\s*(url
 def unpacked(page: str) -> str:
     """The page with Mermaid unpacked in place. The packed bytes depend on the zlib that deflated
     them, while what they unpack to doesn't."""
-    return PACKED.sub(lambda m: m[1] + zlib.decompress(base64.b64decode(m[2]), -15).decode() + m[3], page)
+    return PACKED.sub(lambda m: m[1] + zlib.decompress(base64.b64decode(m[2])).decode() + m[3], page)
 
 
 def test_builds_the_demo_deck_self_contained(tmp_path: Path, capsys: pytest.CaptureFixture[str]):

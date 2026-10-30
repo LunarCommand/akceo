@@ -10,7 +10,7 @@
     var text = atob(document.getElementById('mermaid-packed').textContent);
     var bytes = new Uint8Array(text.length);
     for (var i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i);
-    var stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    var stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
     return new Response(stream).text().then(function(code) {
       var script = document.createElement('script');
       script.textContent = code;

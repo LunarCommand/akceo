@@ -388,10 +388,12 @@ def notice() -> str:
 def packed() -> str:
     """mermaid.min.js, deflated and base64-encoded: under half its size. The page unpacks it with
     the browser's DecompressionStream and runs it. Base64 holds no <, so it can't end the element it
-    sits in."""
-    deflate = zlib.compressobj(9, zlib.DEFLATED, -15)  # negative window bits: raw deflate, no header
+    sits in.
+
+    The data is in zlib format, which DecompressionStream calls 'deflate'. Chromium reads that from
+    version 80, while raw deflate ('deflate-raw') needs 103."""
     script = (VENDOR / "mermaid.min.js").read_bytes()
-    return base64.b64encode(deflate.compress(script) + deflate.flush()).decode("ascii")
+    return base64.b64encode(zlib.compress(script, 9)).decode("ascii")
 
 
 if __name__ == "__main__":
