@@ -174,9 +174,11 @@ The page then draws each diagram as inline SVG when it opens. A few mistakes onl
 that point, such as an invalid date in a `gantt` chart. Those don't stop the build. The slide
 shows Mermaid's message in place of the diagram.
 
-A deck with at least one diagram carries a copy of Mermaid, which adds about 5.6 MB to the
-file. A deck without diagrams doesn't. Mermaid's Font Awesome icons (`fa:fa-car`) don't show,
-because the page loads no outside stylesheets.
+A deck with at least one diagram carries a compressed copy of Mermaid, which adds about 2.4 MB
+to the file. A deck without diagrams doesn't. The page unpacks Mermaid when it opens, which
+needs Chrome or Edge 80, Firefox 113 or Safari 16.4, or newer. In an older browser, each diagram
+shows a message in its place. Mermaid's Font Awesome icons (`fa:fa-car`) don't show, because the
+page loads no outside stylesheets.
 
 ### Frames
 

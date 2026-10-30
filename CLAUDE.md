@@ -9,13 +9,13 @@ dependencies are Pillow (images) and mini-racer (V8, to check Mermaid diagrams a
 - `src/akceo/render.py`: slides to HTML, inline markup, page assembly.
 - `src/akceo/images.py`: image files to data URIs.
 - `src/akceo/mermaid.py`: the build-time diagram check (V8 in a child process it runs as
-  `python -m akceo.mermaid`), the theme's Mermaid config, and the vendored Mermaid script with its
-  license notices, ready for the page.
+  `python -m akceo.mermaid`), the theme's Mermaid config, and the vendored Mermaid script, packed
+  for the page, with its license notices.
 - `src/akceo/themes.py`: theme lookup and the token check.
 - `src/akceo/files.py`: reads user-supplied text files, turning read failures into `DeckError`.
 - `src/akceo/cli.py`: the `akceo` command.
 - `src/akceo/assets/`: the page template, `base.css` (layout rules; all colors and fonts come from
-  theme tokens), `deck.js` (navigation), `diagrams.js` (draws Mermaid diagrams in the page),
+  theme tokens), `deck.js` (navigation), `diagrams.js` (unpacks Mermaid and draws the diagrams),
   `mermaid-shims.js` (browser stand-ins for the build-time check), and `md-viewer.html` (the
   standalone speaker-notes viewer that `akceo viewer` writes out).
 - `src/akceo/assets/vendor/mermaid/`: Mermaid, vendored. Never edit it by hand; run
@@ -51,6 +51,6 @@ uv run akceo check examples/demo/deck.md
 - `docs/how-it-works.md` describes the modules and pipeline. Update it when either changes.
 - Keep JavaScript escapes such as `\u0000` as text in the assets. A raw control character breaks
   the page, and a test checks for it.
-- The vendored Mermaid is excluded from the external-reference test and has its own narrower
-  check. Everything else in the page must pass the full one.
+- The page carries Mermaid packed, and the whole page must pass the external-reference test.
+  Mermaid itself, unpacked, has its own narrower check.
 - Keep the `Unreleased` section of `CHANGELOG.md` current.

@@ -84,13 +84,14 @@ def _diagram(deck: Deck, slide: Slide, images_dir: Path, checker: mermaid.Checke
 
 
 def _diagram_scripts(theme_css: str) -> str:
-    """Mermaid, the theme's Mermaid config and the script that draws the diagrams. The config is JSON
-    with < escaped, so no value in it can close the script element."""
+    """Mermaid, packed, the theme's Mermaid config, and the script that unpacks Mermaid and draws the
+    diagrams under Mermaid's license notices. The config is JSON with < escaped, so no value in it can
+    close the script element."""
     config = json.dumps(mermaid.config(themes.values(theme_css))).replace("<", "\\u003c")
     return (
-        f"<script>\n{mermaid.page_script()}\n</script>\n"
+        f'<script type="application/octet-stream" id="mermaid-packed">{mermaid.packed()}</script>\n'
         f'<script type="application/json" id="mermaid-theme">{config}</script>\n'
-        f"<script>\n{_asset('diagrams.js')}</script>\n"
+        f"<script>\n{mermaid.notice()}{_asset('diagrams.js')}</script>\n"
     )
 
 

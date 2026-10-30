@@ -10,6 +10,12 @@ All notable changes to this project are documented here. The format follows
 - The `image` layout takes an optional `##` heading above the image and a paragraph under it,
   shown as a caption. `style-h2` and `style-sub` apply to them.
 
+### Changed
+
+- Mermaid is embedded compressed, and the page unpacks it when it opens: a deck with a diagram
+  grows by about 2.4 MB instead of 5.8 MB. It still opens straight from disk. Opening it needs
+  Chrome or Edge 80, Firefox 113 or Safari 16.4, or newer.
+
 ## [0.1.0] - 2026-09-24
 
 The first release.

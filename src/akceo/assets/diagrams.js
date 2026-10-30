@@ -3,6 +3,21 @@
 (function() {
   var diagrams = Array.prototype.slice.call(document.querySelectorAll('.diagram'));
   var theme = JSON.parse(document.getElementById('mermaid-theme').textContent);
+  // Mermaid sits in the page deflated and base64-encoded, which keeps the file under half the size.
+  // Unpack it and run it as an inline script, which the page's Content-Security-Policy allows. A
+  // browser without DecompressionStream fails here, and each diagram shows the message.
+  function unpack() {
+    var text = atob(document.getElementById('mermaid-packed').textContent);
+    var bytes = new Uint8Array(text.length);
+    for (var i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i);
+    var stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return new Response(stream).text().then(function(code) {
+      var script = document.createElement('script');
+      script.textContent = code;
+      document.head.appendChild(script);
+    });
+  }
+  var loaded = Promise.resolve().then(unpack);
   // Mermaid sizes its SVG as width="100%" with an inline max-width. Give it a pixel size from its
   // viewBox instead, so it scales to fit the frame the way an <img> does, under the same CSS rules.
   function sized(markup, node) {
@@ -35,10 +50,10 @@
     node.classList.add('failed');
     node.textContent = 'Mermaid could not draw this diagram: ' + ((e && e.message) || e);
   }
-  // Never rejects: any error, from Mermaid or from sizing, marks this diagram failed and leaves the
-  // rest to draw.
+  // Never rejects: any error, from unpacking, from Mermaid or from sizing, marks this diagram failed
+  // and leaves the rest to draw.
   function draw(node, n) {
-    return Promise.resolve().then(function() {
+    return loaded.then(function() {
       var source = node.querySelector('.diagram-src').textContent;
       // An unframed diagram takes the theme's colors; one in a frame keeps Mermaid's defaults.
       // initialize starts again from Mermaid's defaults each time, so one diagram can't leak into

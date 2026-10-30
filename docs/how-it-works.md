@@ -201,7 +201,7 @@ flowchart TD
     render --> themes["themes.py<br/>load(), token check"]
     themes --> files
     render --> images["images.py<br/>data_uri()"]
-    render --> mermaid["mermaid.py<br/>Checker, config(), page_script()"]
+    render --> mermaid["mermaid.py<br/>Checker, config(), notice(), packed()"]
     mermaid --> vendor[["assets/vendor/mermaid/<br/>mermaid.min.js · notices"]]
     render --> assets[["assets/<br/>page.html · base.css · deck.js · diagrams.js"]]
     themes --> builtin[["themes/<br/>midnight.css · paper.css"]]
@@ -220,7 +220,7 @@ flowchart TD
 | `parse.py` | Turns Markdown into a validated `Deck`. All input rules live here. |
 | `themes.py` | Finds a theme by name or path, checks that it sets every token, and reads the token values that Mermaid diagrams use |
 | `images.py` | Turns an image file into a `data:` URI, shrinking raster images |
-| `mermaid.py` | Checks each `.mmd` diagram with Mermaid's parser in V8, builds the theme's Mermaid config, and prepares the vendored script, with its license notices, for the page |
+| `mermaid.py` | Checks each `.mmd` diagram with Mermaid's parser in V8, builds the theme's Mermaid config, and packs the vendored script for the page, with its license notices |
 | `files.py` | Reads user files, turning read and decode failures into `DeckError` |
 | `errors.py` | `DeckError`, the one exception type the CLI reports to the user |
 
@@ -392,9 +392,12 @@ styles and load only `data:` images and fonts. Mermaid fetches label images whil
 nothing done to the SVG afterwards could stop that load; the policy does. `diagrams.js` also
 drops any link to outside the deck from the drawn SVG, so a click can't leave it.
 
-The page gets the vendored Mermaid, under a comment that carries its license and the notices of
-every package it bundles, then the theme's Mermaid config as JSON, then `diagrams.js`. That
-script waits for the fonts to load and draws the diagrams one at a time. Each one is drawn with
+The page gets the vendored Mermaid deflated and base64-encoded, which is under half its size,
+then the theme's Mermaid config as JSON, then `diagrams.js` under a comment that carries
+Mermaid's license and the notices of every package it bundles. That script unpacks Mermaid with
+the browser's `DecompressionStream` and runs it as an inline script, which the
+Content-Security-Policy allows, so the page still works opened straight from disk. It then waits
+for the fonts to load and draws the diagrams one at a time. Each one is drawn with
 the theme config if it has no frame, or Mermaid's defaults if it has one. The SVG replaces the
 source, sized from its `viewBox` so the same CSS that fits an `<img>` to its frame fits the
 diagram. A diagram that Mermaid can't draw, or any other error while drawing, shows the message

@@ -2,12 +2,13 @@
 
 The check runs Mermaid's own parse() in V8 through mini-racer, so a broken diagram stops the build
 with Mermaid's message and no browser or Node is needed. The page draws each diagram when it opens,
-with the same vendored mermaid.min.js.
+with the same vendored mermaid.min.js, which it carries deflated and unpacks first.
 
 V8 runs in a child process (python -m akceo.mermaid). mini-racer can't interrupt JavaScript that
 runs after an await, and parse() is async, so a diagram that sends Mermaid into a loop could hang the
 build for good. A child process can be killed when a diagram takes too long, or on Ctrl-C."""
 
+import base64
 import json
 import os
 import queue
@@ -15,6 +16,7 @@ import re
 import subprocess
 import sys
 import threading
+import zlib
 from collections.abc import Callable
 from importlib import resources
 from pathlib import Path
@@ -369,19 +371,27 @@ def _is_dark(color: str) -> bool | None:
     return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.5
 
 
-def page_script() -> str:
-    """mermaid.min.js ready to sit in the page's <script>, under a comment that carries Mermaid's
-    license and the notices of every package it bundles, as their licenses ask of each copy.
+def notice() -> str:
+    """A comment for the page's script that carries Mermaid's license and the notices of every package
+    it bundles, as their licenses ask of each copy. It stays readable while Mermaid itself is packed.
 
-    Any <script or </script text is escaped as \\x3C, which JavaScript strings and regular
-    expressions read as <, so it can't end or restart the page's script element."""
+    Any <script or </script text is escaped as \\x3C, so it can't end or restart the script element."""
     manifest = json.loads((VENDOR / "manifest.json").read_text(encoding="utf-8"))
     notices = "\n\n".join(
         (VENDOR / name).read_text(encoding="utf-8").strip() for name in ("LICENSE", "THIRD_PARTY_NOTICES")
     )
-    comment = f"/*! Mermaid {manifest['version']}\n\n{notices.replace('*/', '* /')}\n*/\n"
-    script = (VENDOR / "mermaid.min.js").read_text(encoding="utf-8")
-    return re.sub(r"<(/?script)", r"\\x3C\1", comment + script, flags=re.IGNORECASE)
+    title = f"Mermaid {manifest['version']}, packed in #mermaid-packed"
+    comment = f"/*! {title}\n\n{notices.replace('*/', '* /')}\n*/\n"
+    return re.sub(r"<(/?script)", r"\\x3C\1", comment, flags=re.IGNORECASE)
+
+
+def packed() -> str:
+    """mermaid.min.js, deflated and base64-encoded: under half its size. The page unpacks it with
+    the browser's DecompressionStream and runs it. Base64 holds no <, so it can't end the element it
+    sits in."""
+    deflate = zlib.compressobj(9, zlib.DEFLATED, -15)  # negative window bits: raw deflate, no header
+    script = (VENDOR / "mermaid.min.js").read_bytes()
+    return base64.b64encode(deflate.compress(script) + deflate.flush()).decode("ascii")
 
 
 if __name__ == "__main__":
