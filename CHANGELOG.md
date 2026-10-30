@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-30
+
 ### Fixed
 
 - An image node in a diagram, whose `img:` is a `data:` URI, shows its image again. The page
