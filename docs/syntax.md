@@ -57,7 +57,7 @@ A slide starts with `key: value` header lines. Then comes a blank line, then the
 | `image-wide` | split | `yes` gives the image the wider column. |
 | `image-frame` | split, image | `yes` or `no` for this slide's image, overriding the deck's `image-frame`. |
 | `dim-last-column` | table | `yes` shows the last column in muted text. |
-| `style-h1`, `style-h2`, `style-lead`, `style-ul`, `style-ol`, `style-sub` | all | Inline CSS for that element, for one-off spacing fixes. `style-sub` applies to the paragraph. It can't reference files or URLs. |
+| `style-h1`, `style-h2`, `style-lead`, `style-ul`, `style-ol`, `style-sub` | all | Inline CSS for that element, for one-off spacing fixes. `style-sub` applies to the paragraph, which is the caption on an `image` slide. It can't reference files or URLs. |
 
 ### Layouts
 
@@ -68,10 +68,11 @@ A slide starts with `key: value` header lines. Then comes a blank line, then the
 | `split` | An image left, text right | `##` heading, any number of `###` phases and `-` lists, one `*note*` | `##` heading |
 | `steps` | A numbered sequence | `##` heading, paragraph, `1.` list | `##` heading, `1.` list |
 | `table` | A table | `##` heading, `\|` table | `##` heading, `\|` table |
-| `image` | An image filling the slide, the kicker top left | nothing | nothing |
+| `image` | An image filling the slide, with an optional heading above it and caption below it | `##` heading, paragraph | nothing |
 
 Each kind of content may appear once per slide. In the `split` layout, phases and lists may
-repeat and render in the order written. There, the note always renders last.
+repeat and render in the order written. There, the note always renders last. In the `image`
+layout, the paragraph is a caption: smaller muted text, centered under the image.
 
 ## Blocks
 
@@ -173,9 +174,11 @@ The page then draws each diagram as inline SVG when it opens. A few mistakes onl
 that point, such as an invalid date in a `gantt` chart. Those don't stop the build. The slide
 shows Mermaid's message in place of the diagram.
 
-A deck with at least one diagram carries a copy of Mermaid, which adds about 5.6 MB to the
-file. A deck without diagrams doesn't. Mermaid's Font Awesome icons (`fa:fa-car`) don't show,
-because the page loads no outside stylesheets.
+A deck with at least one diagram carries a compressed copy of Mermaid, which adds about 2.4 MB
+to the file. A deck without diagrams doesn't. The page unpacks Mermaid when it opens. Unpacking
+and Mermaid itself together need Chrome or Edge 98, Firefox 113 or Safari 16.4, or newer. In an
+older browser, each diagram shows a message in its place. Mermaid's Font Awesome icons
+(`fa:fa-car`) don't show, because the page loads no outside stylesheets.
 
 ### Frames
 

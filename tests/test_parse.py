@@ -294,20 +294,29 @@ def test_split_without_an_image_parses():
     assert "image" not in d.slides[0].meta
 
 
-def test_image_layout_takes_image_keys_and_no_content():
+def test_image_layout_takes_image_keys_and_needs_no_content():
     d = deck("---\nlayout: image\nkicker: K\nimage: x.png\nimage-alt: A\nimage-max: 800\n")
     assert d.slides[0].layout == "image"
     assert d.slides[0].blocks == ()
     assert deck("---\nlayout: image\n").slides[0].meta == {"layout": "image"}
 
 
+def test_image_layout_takes_a_heading_and_a_caption():
+    d = deck("---\nlayout: image\nimage: x.png\n\n## Results\n\nThroughput after the fix,\nper region.\n")
+    assert d.slides[0].blocks == (
+        Block("h2", text="Results"),
+        Block("para", text="Throughput after the fix, per region."),
+    )
+
+
 @pytest.mark.parametrize(
     ("source", "message"),
     [
         (
-            "---\nlayout: image\n\n## A\n",
-            "a ## heading isn't used by the image layout, which takes no content",
+            "---\nlayout: image\n\n- a\n",
+            "a - list isn't used by the image layout, which takes a ## heading and a paragraph",
         ),
+        ("---\nlayout: image\n\nOne.\n\nTwo.\n", "the image layout takes only one paragraph"),
         ("---\nlayout: image\nimage-wide: yes\n", "'image-wide' only applies to the split layout"),
         ("---\nimage: x.png\n\n## A\n", "'image' only applies to the split and image layouts"),
     ],

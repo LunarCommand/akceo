@@ -52,5 +52,7 @@ as it was. It stops, and writes nothing, when:
 - a package has no license file. Find its copyright notice, then add it to `NO_LICENSE_FILE`.
 
 Then run the full test suite: `tests/test_mermaid.py` runs the real parser, so a Mermaid release
-that no longer works with the stand-ins in `assets/mermaid-shims.js` fails there. Build
-`examples/demo/deck.md` and look at the diagram slide too, since drawing isn't covered by the tests.
+that no longer works with the stand-ins in `assets/mermaid-shims.js` fails there. The test that
+checks the committed `examples/demo/deck.html` fails too, until you rebuild it with
+`akceo build examples/demo/deck.md`. Look at its diagram slide, since drawing isn't covered by
+the tests.
