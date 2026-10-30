@@ -5,6 +5,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The `image` layout takes an optional `##` heading above the image and a paragraph under it,
+  shown as a caption. `style-h2` and `style-sub` apply to them.
+- The demo deck, built, is online at <https://lunarcommand.github.io/akceo/> and kept in the
+  repository as `examples/demo/deck.html`, so you can see akceo's output without installing it.
+
+### Changed
+
+- Mermaid is embedded compressed, and the page unpacks it when it opens: a deck with a diagram
+  grows by about 2.4 MB instead of 5.8 MB. It still opens straight from disk. Opening it needs
+  Chrome or Edge 98, Firefox 113 or Safari 16.4, or newer.
+
 ## [0.1.0] - 2026-09-24
 
 The first release.

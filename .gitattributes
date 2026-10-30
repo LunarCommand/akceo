@@ -2,3 +2,5 @@
 # 5.6 MB line, so diffs show it as changed rather than printing it.
 src/akceo/assets/vendor/** linguist-vendored
 src/akceo/assets/vendor/mermaid/mermaid.min.js -diff
+# The demo, built, with Mermaid packed on one long line. Its source is examples/demo/deck.md.
+examples/demo/deck.html linguist-generated -diff

@@ -84,13 +84,14 @@ def _diagram(deck: Deck, slide: Slide, images_dir: Path, checker: mermaid.Checke
 
 
 def _diagram_scripts(theme_css: str) -> str:
-    """Mermaid, the theme's Mermaid config and the script that draws the diagrams. The config is JSON
-    with < escaped, so no value in it can close the script element."""
+    """Mermaid, packed, the theme's Mermaid config, and the script that unpacks Mermaid and draws the
+    diagrams under Mermaid's license notices. The config is JSON with < escaped, so no value in it can
+    close the script element."""
     config = json.dumps(mermaid.config(themes.values(theme_css))).replace("<", "\\u003c")
     return (
-        f"<script>\n{mermaid.page_script()}\n</script>\n"
+        f'<script type="application/octet-stream" id="mermaid-packed">{mermaid.packed()}</script>\n'
         f'<script type="application/json" id="mermaid-theme">{config}</script>\n'
-        f"<script>\n{_asset('diagrams.js')}</script>\n"
+        f"<script>\n{mermaid.notice()}{_asset('diagrams.js')}</script>\n"
     )
 
 
@@ -183,7 +184,21 @@ def render_slide(slide: Slide, image_src: str = "", framed: bool = True, diagram
     h2 = f"<h2{_style(slide, 'h2')}>{inline(_text(slide, 'h2'))}</h2>"
 
     if slide.layout == "image":
-        out.append(f'    <div class="figure-full">{_figure(slide, image_src, framed, diagram)}</div>')
+        if slide.first("h2"):
+            out.append(f"    {h2}")
+        figure = f'<div class="figure-full">{_figure(slide, image_src, framed, diagram)}</div>'
+        para = slide.first("para")
+        if para:
+            # The figure holds the image and its caption together, so the caption stays under the image.
+            # Without an image the figure holds the dashed placeholder, and the empty class sizes it.
+            caption = f'<figcaption class="caption"{_style(slide, "sub")}>{inline(para.text)}</figcaption>'
+            empty = "" if "image" in slide.meta else " empty"
+            out.append(f'    <figure class="captioned{empty}">')
+            out.append(f"      {figure}")
+            out.append(f"      {caption}")
+            out.append("    </figure>")
+        else:
+            out.append(f"    {figure}")
 
     elif slide.layout == "split":
         wide = " img-wide" if slide.flag("image-wide") else ""

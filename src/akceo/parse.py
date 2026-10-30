@@ -29,7 +29,7 @@ LAYOUT_BLOCKS: dict[str, dict[str, bool]] = {
     "split": {"h2": False, "phase": True, "ul": True, "note": False},
     "steps": {"h2": False, "para": False, "ol": False},
     "table": {"h2": False, "table": False},
-    "image": {},
+    "image": {"h2": False, "para": False},
 }
 REQUIRED_BLOCKS: dict[str, tuple[str, ...]] = {
     "title": ("h1",),

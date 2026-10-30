@@ -88,7 +88,7 @@ dim-last-column: yes
 | **split** | A diagram with commentary | image, `##` heading, phases, lists, note |
 | **steps** | A sequence | `##` heading, paragraph, numbered list |
 | **table** | Comparisons | `##` heading, table |
-| **image** | A diagram on its own | image, kicker |
+| **image** | A diagram on its own | image, kicker, `##` heading, caption |
 
 ---
 
@@ -97,6 +97,10 @@ kicker: The image layout
 image: flow.mmd
 image-frame: no
 image-alt: deck.md and a theme go into akceo build, which writes deck.html
+
+## One diagram, the whole slide
+
+Mermaid draws `flow.mmd` when the page opens. The heading and this caption are optional.
 
 ---
 

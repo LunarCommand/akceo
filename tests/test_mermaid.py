@@ -1,7 +1,9 @@
+import base64
 import hashlib
 import json
 import re
 import sys
+import zlib
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -281,26 +283,32 @@ def test_notices_list_the_bundled_packages():
     assert ("dompurify", "3.4.12") in headings  # the version the bundle was built with
 
 
-def test_page_script_carries_the_license_notices():
-    script = mermaid.page_script()
-    comment_end = script.index("*/")
-    comment = script[:comment_end]
-    assert comment.startswith("/*! Mermaid 12.0.0\n")
-    assert "MIT License" in comment
-    assert "Eclipse Public License" in comment
-    assert "https://github.com/kieler/elkjs" in comment
-    assert script[comment_end:].startswith("*/\n")
-    assert not re.search(r"<script|</script", script, re.IGNORECASE)
+def test_notice_carries_the_license_notices():
+    notice = mermaid.notice()
+    assert notice.startswith("/*! Mermaid 12.0.0, packed in #mermaid-packed\n")
+    assert "MIT License" in notice
+    assert "Eclipse Public License" in notice
+    assert "https://github.com/kieler/elkjs" in notice
+    assert notice.index("*/") == len(notice) - len("*/\n")
+    assert not re.search(r"<script|</script", notice, re.IGNORECASE)
 
 
-def test_page_script_escapes_script_tags_and_keeps_its_comment_closed(
+def test_notice_escapes_script_tags_and_keeps_its_comment_closed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     (tmp_path / "manifest.json").write_text('{"version": "1.0.0"}')
-    (tmp_path / "LICENSE").write_text("MIT")
-    (tmp_path / "THIRD_PARTY_NOTICES").write_text("a */ in a notice")
-    (tmp_path / "mermaid.min.js").write_text('var a = "</script>", b = /<SCRIPT/;')
+    (tmp_path / "LICENSE").write_text("MIT </script>")
+    (tmp_path / "THIRD_PARTY_NOTICES").write_text("a */ in a notice <SCRIPT")
     monkeypatch.setattr(mermaid, "VENDOR", tmp_path)
-    assert mermaid.page_script() == (
-        '/*! Mermaid 1.0.0\n\nMIT\n\na * / in a notice\n*/\nvar a = "\\x3C/script>", b = /\\x3CSCRIPT/;'
+    assert mermaid.notice() == (
+        "/*! Mermaid 1.0.0, packed in #mermaid-packed\n\n"
+        "MIT \\x3C/script>\n\na * / in a notice \\x3CSCRIPT\n*/\n"
     )
+
+
+def test_packed_unpacks_to_the_vendored_script():
+    packed = mermaid.packed()
+    script = (mermaid.VENDOR / "mermaid.min.js").read_bytes()
+    assert re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", packed)
+    assert zlib.decompress(base64.b64decode(packed)) == script
+    assert len(packed) < len(script) / 2

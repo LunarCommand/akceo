@@ -16,5 +16,6 @@ dist/
 .ruff_cache/
 .pyright/
 
-# Built example decks
+# Built example decks, except the demo, which is kept built. A test checks it matches a fresh build.
 examples/**/*.html
+!examples/demo/deck.html

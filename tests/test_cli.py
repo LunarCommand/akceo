@@ -1,5 +1,7 @@
+import base64
 import re
 import shutil
+import zlib
 from pathlib import Path
 
 import pytest
@@ -10,15 +12,22 @@ from akceo.cli import main
 ROOT = Path(__file__).parents[1]
 DEMO = ROOT / "examples" / "demo"
 EXTERNAL_REF = re.compile(r"""(src|href)=["']?(https?:|//|\.{0,2}/)|<link|@import|url\(""")
-# The vendored Mermaid holds url(#marker) references inside its SVGs and CSS keywords such as
-# @import as strings, so it gets a narrower check of its own: nothing that would load from outside.
-# The browser itself refuses any outside load, whatever a diagram or theme tries.
+# The page carries Mermaid packed, so the full check reads everything else in it. Mermaid itself
+# holds url(#marker) references inside its SVGs and CSS keywords such as @import as strings, so,
+# unpacked, it gets a narrower check of its own: nothing that would load from outside. The browser
+# itself refuses any outside load, whatever a diagram or theme tries.
 CSP = (
     "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'unsafe-inline'; "
     "style-src 'unsafe-inline'; img-src data:; font-src data:\">"
 )
-MERMAID_SCRIPT = re.compile(r"<script>\n/\*! Mermaid .*?</script>\n", re.DOTALL)
+PACKED = re.compile(r'(<script type="application/octet-stream" id="mermaid-packed">)([^<]*)(</script>)')
 OUTSIDE_LOAD = re.compile(r"""(src|href)=["']?(https?:|//)|(url\(|@import\s*(url\()?)["']?(https?:|//)""")
+
+
+def unpacked(page: str) -> str:
+    """The page with Mermaid unpacked in place. The packed bytes depend on the zlib that deflated
+    them, while what they unpack to doesn't."""
+    return PACKED.sub(lambda m: m[1] + zlib.decompress(base64.b64decode(m[2])).decode() + m[3], page)
 
 
 def test_builds_the_demo_deck_self_contained(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
@@ -33,14 +42,24 @@ def test_builds_the_demo_deck_self_contained(tmp_path: Path, capsys: pytest.Capt
     assert page.count(CSP) == 1
     assert page.index(CSP) < page.index("<style>")
     assert page.count('<div class="diagram bare"') == 1
-    assert len(MERMAID_SCRIPT.findall(page)) == 1
-    assert not EXTERNAL_REF.search(MERMAID_SCRIPT.sub("", page))
-    assert not OUTSIDE_LOAD.search(page)
+    assert len(PACKED.findall(page)) == 1
+    assert page.count("/*! Mermaid ") == 1
+    assert not EXTERNAL_REF.search(page)
+    assert not OUTSIDE_LOAD.search(unpacked(page))
     assert "Author note" not in page
 
 
+def test_the_committed_demo_build_is_current(tmp_path: Path):
+    out = tmp_path / "demo.html"
+    assert main(["build", str(DEMO / "deck.md"), "-o", str(out)]) == 0
+    committed = DEMO / "deck.html"
+    # Compared without assert ==, whose diff of a page this size would swamp the message.
+    if not committed.is_file() or unpacked(out.read_text()) != unpacked(committed.read_text()):
+        pytest.fail("examples/demo/deck.html is out of date: uv run akceo build examples/demo/deck.md")
+
+
 def test_default_output_sits_next_to_the_deck(tmp_path: Path):
-    shutil.copytree(DEMO, tmp_path / "demo")
+    shutil.copytree(DEMO, tmp_path / "demo", ignore=shutil.ignore_patterns("*.html"))
     assert main(["build", str(tmp_path / "demo" / "deck.md")]) == 0
     assert (tmp_path / "demo" / "deck.html").is_file()
 
@@ -75,7 +94,7 @@ def test_image_frame_setting_reaches_the_page(tmp_path: Path):
     page = (tmp_path / "deck.html").read_text()
     assert page.count('<img class="bare" src="data:image/png') == 1
     assert page.count('<img src="data:image/png') == 1
-    assert "/*! Mermaid" not in page and "mermaid-theme" not in page
+    assert "/*! Mermaid" not in page and "mermaid-packed" not in page and "mermaid-theme" not in page
     assert page.count(CSP) == 1
 
 
@@ -90,6 +109,7 @@ def test_diagram_frames_pick_the_colors(tmp_path: Path):
     assert page.count('<div class="diagram bare" role="img" aria-label="" data-mermaid="theme">') == 1
     assert page.count('<pre class="diagram-src">flowchart LR\n  a --&gt; b\n</pre>') == 2
     assert page.count("/*! Mermaid") == 1
+    assert page.count('<script type="application/octet-stream" id="mermaid-packed">') == 1
     assert '<script type="application/json" id="mermaid-theme">{"theme": "base", ' in page
 
 

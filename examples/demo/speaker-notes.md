@@ -35,8 +35,8 @@ There are only six layouts, on purpose. Most slides are `bullets`; `split` is fo
 
 > The muted last column is `dim-last-column: yes` on this slide.
 
-### 7 · The image layout *(0:15)*
-The same diagram, now on its own and drawn by Mermaid from `flow.mmd`, in the theme's colors because it has no frame. The image fills the slide and the kicker stays in the corner. Leave out `image:` and the slide shows a dashed placeholder until the diagram exists.
+### 7 · One diagram, the whole slide *(0:15)*
+The same diagram, now on its own and drawn by Mermaid from `flow.mmd`, in the theme's colors because it has no frame. The image fills the space between the heading and the caption. Both are optional: leave them out and the image takes the whole slide. Leave out `image:` and the slide shows a dashed placeholder until the diagram exists.
 
 ### 8 · Same deck, any look *(0:20)*
 Close by rebuilding with `--theme paper` live, if time allows. The content doesn't change, only the look.
