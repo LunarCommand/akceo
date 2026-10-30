@@ -5,6 +5,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Ctrl-C during a command prints `akceo: interrupted` and exits with code 130, instead of
+  a Python traceback.
+
 ## [0.2.1] - 2026-10-30
 
 ### Fixed
