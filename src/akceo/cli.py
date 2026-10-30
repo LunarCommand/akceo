@@ -53,6 +53,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     except DeckError as e:
         print(f"akceo: {e}", file=sys.stderr)
         return 1
+    except KeyboardInterrupt:
+        print("akceo: interrupted", file=sys.stderr)
+        return 130
     return 0
 
 
