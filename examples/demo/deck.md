@@ -34,6 +34,8 @@ style-lead: max-width:40ch;margin-bottom:3vh
 - `**bold**` gives **bold**, and `***strong***` gives ***strong***.
 - `==accent==` gives ==accent==, and `((dim))` gives ((a muted aside)).
 - Backticks give code, and markup inside them stays literal: `==like this==`.
+- `[text](url)` links out, as to the [format reference](https://github.com/LunarCommand/akceo/blob/main/docs/syntax.md),
+  in a new tab. `[text](#7)` jumps to a slide, such as [the image layout](#7).
 - Indent a line by two spaces to wrap a long item across lines
   in the source without breaking it on the slide.
 

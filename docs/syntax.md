@@ -123,8 +123,18 @@ can't start with `//`.
 | `==text==` | Accent color |
 | `((text))` | Muted text, shown in parentheses |
 | `` `text` `` | Code. Markup inside it stays literal. |
+| `[text](url)` | A link. The text can carry the other marks. |
 
 Characters like `<` and `&` are escaped, so raw HTML shows as text.
+
+A link goes to one of these, and anything else stops the build:
+
+- an `https:` or `http:` address, or a `mailto:` address. These always open in a new tab, so
+  the deck stays open.
+- a slide in the deck, as `#N`, such as `[back to the plan](#3)`. The slide must exist.
+
+A URL can't contain a space, a quote or `)`. Write `%20` for a space and `%29` for `)`.
+Clicking a link follows it without changing the slide.
 
 ## Images
 
@@ -211,7 +221,9 @@ build.
 
 A theme is a CSS file. akceo adds it after its own layout rules, so a theme sets the tokens below
 and can also override any layout rule. A theme that leaves out any token stops the build, and
-the message lists the missing ones.
+the message lists the missing ones. The three link tokens are the exception: they're needed only
+when the deck has a link, so a theme written before links existed still builds a deck without
+any.
 
 | Token | Used for |
 | --- | --- |
@@ -222,6 +234,9 @@ the message lists the missing ones.
 | `--strong` | Bold text in lists and the first table column, phase names, `***strong***` |
 | `--accent` | Kickers, list markers, `==accent==`, table headers, the progress bar |
 | `--accent2` | Code |
+| `--link` | Link text. Needed only when the deck has a link. |
+| `--link-hover` | Link text on hover and keyboard focus. Needed only when the deck has a link. |
+| `--link-underline` | Link underline, as a `text-decoration` value such as `underline 1px` or `none`. Needed only when the deck has a link. |
 | `--figure-bg` | Background behind `split` and `image` images |
 | `--figure-shadow` | Shadow under `split` and `image` images (a `box-shadow` value) |
 | `--font` | Body font stack |

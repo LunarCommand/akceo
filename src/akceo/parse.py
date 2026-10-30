@@ -61,6 +61,10 @@ TABLE_ROW = re.compile(r"^(\|.*)$")
 BLOCK_START = re.compile(r"^(#{1,3} |- |> |\||\d+\. )")
 DELIMITER_CELL = re.compile(r"^:?-+:?$")
 STYLE_URL = re.compile(r"(url|image-set)\s*\(", re.IGNORECASE)
+CODE_SPAN = re.compile(r"`[^`]+`")
+LINK = re.compile(r"\[([^\]\n]+)\]\(([^)\n]*)\)")
+OUTSIDE_LINK = re.compile(r"(https?://|mailto:)[^\s\"'<>`]+", re.IGNORECASE)
+SLIDE_LINK = re.compile(r"#(\d+)")
 
 
 @dataclass(frozen=True)
@@ -107,6 +111,11 @@ class Deck:
     def error(self, slide: Slide, message: str) -> DeckError:
         return _error(self.path, slide.line, f"slide {slide.number}: {message}")
 
+    def has_links(self) -> bool:
+        return any(
+            LINK.search(CODE_SPAN.sub("", text)) for slide in self.slides for text in _slide_texts(slide)
+        )
+
 
 Entry = tuple[int, str, str]  # (line number, key, value)
 
@@ -139,7 +148,35 @@ def parse(text: str, path: Path) -> Deck:
             slides.append(_slide(path, len(slides) + 1, start, lines))
     if not slides:
         raise DeckError(f"{path}: the deck has no slides; start each slide after a --- line")
+    for slide in slides:
+        _check_links(path, slide, len(slides))
     return Deck(path, config, tuple(slides))
+
+
+def _slide_texts(slide: Slide) -> list[str]:
+    texts = [slide.meta.get("kicker", ""), slide.meta.get("meta", "")]
+    for block in slide.blocks:
+        texts += [block.text, block.body, *block.items, *(cell for row in block.rows for cell in row)]
+    return texts
+
+
+def _check_links(path: Path, slide: Slide, count: int) -> None:
+    """Every [text](url) must go to the web, to an email address, or to a slide in this deck. A
+    link inside a code span is code, not a link."""
+    for text in _slide_texts(slide):
+        for m in LINK.finditer(CODE_SPAN.sub("", text)):
+            url = m.group(2)
+            slide_link = SLIDE_LINK.fullmatch(url)
+            if slide_link and not 1 <= int(slide_link.group(1)) <= count:
+                message = f"the link to {url} goes past the last slide, {count}"
+                raise _error(path, slide.line, f"slide {slide.number}: {message}")
+            if not slide_link and not OUTSIDE_LINK.fullmatch(url):
+                raise _error(
+                    path,
+                    slide.line,
+                    f"slide {slide.number}: can't link to '{url}'; a link goes to an https:, http: or "
+                    "mailto: address, or to a slide as #N",
+                )
 
 
 def _error(path: Path, line: int, message: str) -> DeckError:

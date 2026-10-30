@@ -354,3 +354,50 @@ def test_image_frame_errors(source: str, message: str):
     with pytest.raises(DeckError) as e:
         parse(source, Path("deck.md"))
     assert message in str(e.value)
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "- [docs](https://x.example/guide)",
+        "- [docs](http://x.example)",
+        "- [write](mailto:a@b.example)",
+        "- [back](#1), [next](#2)",
+        "- `[not a link](javascript:x)`",
+        "- [brackets] and (parentheses) on their own",
+    ],
+)
+def test_allowed_links_parse(line: str):
+    deck(f"---\n## A\n\n{line}\n---\n## B\n")
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ("[x](javascript:alert(1)", "can't link to 'javascript:alert(1'"),
+        ("[x](slides.html)", "can't link to 'slides.html'"),
+        ("[x](//x.example)", "can't link to '//x.example'"),
+        ("[x]()", "can't link to ''"),
+        ('[x](https://x.example/"q")', "can't link to 'https://x.example/\"q\"'"),
+        ("[x](https://x.example/a b)", "can't link to 'https://x.example/a b'"),
+        ("[x](#0)", "the link to #0 goes past the last slide, 2"),
+        ("[x](#3)", "the link to #3 goes past the last slide, 2"),
+    ],
+)
+def test_bad_links_name_the_slide(text: str, message: str):
+    with pytest.raises(DeckError) as e:
+        parse(f"---\n## A\n---\nkicker: K\n\n## B\n\n- {text}\n", Path("deck.md"))
+    allowed = "; a link goes to an https:, http: or mailto: address, or to a slide as #N"
+    assert str(e.value) == f"deck.md:4: slide 2: {message}" + ("" if "goes past" in message else allowed)
+
+
+def test_links_are_checked_in_every_text_a_slide_shows():
+    for source in (
+        "---\nlayout: title\nmeta: [x](ftp://x)\n\n# T\n",
+        "---\nkicker: [x](ftp://x)\n\n## T\n",
+        "---\nlayout: table\n\n## T\n| a | [x](ftp://x) |\n",
+        "---\nlayout: split\n\n## T\n### P\n[x](ftp://x)\n",
+        "---\nlayout: image\n\n## T\n\n[x](ftp://x)\n",
+    ):
+        with pytest.raises(DeckError, match="can't link to 'ftp://x'"):
+            parse(source, Path("deck.md"))
