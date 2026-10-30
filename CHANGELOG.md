@@ -5,6 +5,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-30
+
+### Fixed
+
+- An image node in a diagram, whose `img:` is a `data:` URI, shows its image again. The page
+  dropped the link from every image in a drawn diagram, so the node drew as an empty box. It
+  now keeps a `data:` image and still drops any other link that would leave the deck. Broken
+  since 0.1.0.
+
 ## [0.2.0] - 2026-10-30
 
 ### Added
