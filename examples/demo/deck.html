@@ -5154,6 +5154,14 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
     });
   }
   var loaded = Promise.resolve().then(unpack);
+  // Whether a drawn diagram keeps this attribute. The page's Content-Security-Policy blocks every
+  // outside load, and the build rejects outside links, so this only catches a link that still gets
+  // through. A link stays when it can't leave the deck: a # anchor, or a data: URI on an <image>,
+  // which the build allows and the policy loads. tests/test_mermaid.py runs this function in V8.
+  function keepsLink(tag, name, value) {
+    if (!/^(xlink:)?href$/i.test(name) || /^\s*#/.test(value)) return true;
+    return tag.toLowerCase() === 'image' && /^\s*data:/i.test(value);
+  }
   // Mermaid sizes its SVG as width="100%" with an inline max-width. Give it a pixel size from its
   // viewBox instead, so it scales to fit the frame the way an <img> does, under the same CSS rules.
   function sized(markup, node) {
@@ -5167,11 +5175,9 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
       svg.setAttribute('height', Math.round(box.height));
       svg.style.maxWidth = '';
     }
-    // The page's Content-Security-Policy blocks every outside load, and the build rejects outside
-    // links. Drop any link that still gets through, so a click can't leave the deck.
     svg.querySelectorAll('*').forEach(function(el) {
       Array.prototype.slice.call(el.attributes).forEach(function(attr) {
-        if (/^(xlink:)?href$/i.test(attr.name) && !/^\s*#/.test(attr.value)) el.removeAttributeNode(attr);
+        if (!keepsLink(el.localName, attr.name, attr.value)) el.removeAttributeNode(attr);
       });
     });
     node.classList.forEach(function(name){ svg.classList.add(name); });
