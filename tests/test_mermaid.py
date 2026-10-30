@@ -312,3 +312,31 @@ def test_packed_unpacks_to_the_vendored_script():
     assert re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", packed)
     assert zlib.decompress(base64.b64decode(packed)) == script
     assert len(packed) < len(script) / 2
+
+
+@pytest.mark.parametrize(
+    ("tag", "name", "value", "kept"),
+    [
+        ("image", "href", "data:image/png;base64,AAAA", True),
+        ("image", "xlink:href", " data:image/svg+xml;base64,AAAA", True),
+        ("IMAGE", "HREF", "DATA:image/png;base64,AAAA", True),
+        ("a", "href", "#5", True),
+        ("use", "xlink:href", "#marker", True),
+        ("image", "width", "64", True),
+        ("image", "href", "https://x.example/a.png", False),
+        ("image", "href", "logo.png", False),
+        ("a", "href", "data:text/html,hi", False),
+        ("a", "xlink:href", "https://x.example", False),
+        ("use", "href", "data:image/svg+xml;base64,AAAA", False),
+    ],
+)
+def test_drawn_diagrams_keep_only_links_that_stay_in_the_deck(tag: str, name: str, value: str, kept: bool):
+    # diagrams.js drops links from each drawn SVG. Its rule is run here in V8, as the page runs it.
+    from py_mini_racer import MiniRacer
+
+    source = (mermaid.ASSETS / "diagrams.js").read_text(encoding="utf-8")
+    function = re.search(r"^  function keepsLink\(.*?^  \}$", source, re.MULTILINE | re.DOTALL)
+    assert function, "diagrams.js no longer defines keepsLink"
+    ctx = MiniRacer()
+    ctx.eval(function.group(0))
+    assert ctx.call("keepsLink", tag, name, value) is kept
