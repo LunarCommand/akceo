@@ -21,6 +21,7 @@ TOKENS = (
     "font",
     "mono",
 )
+LINK_TOKENS = ("link", "link-hover", "link-underline")  # needed only by a deck with links
 BUILTIN = resources.files("akceo") / "themes"
 LEADING_COMMENT = re.compile(r"^\s*/\*\s*(.*?)\s*\*/", re.DOTALL)
 CSS_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
@@ -52,11 +53,16 @@ def load(spec: str, base: Path) -> str:
         css, label = entry.read_text(encoding="utf-8"), spec
     if re.search(r"</style", css, re.IGNORECASE):
         raise DeckError(f"theme {label} contains '</style', which would end the page's style block")
-    declarations = _declarations(css)
-    missing = [t for t in TOKENS if not re.search(rf"(?<![\w-])--{re.escape(t)}\s*:", declarations)]
-    if missing:
-        raise DeckError(f"theme {label} doesn't set: {', '.join('--' + t for t in missing)}")
+    unset = missing(css, TOKENS)
+    if unset:
+        raise DeckError(f"theme {label} doesn't set: {', '.join('--' + t for t in unset)}")
     return css
+
+
+def missing(css: str, tokens: tuple[str, ...]) -> list[str]:
+    """The tokens, of those given, that a theme doesn't set."""
+    declarations = _declarations(css)
+    return [t for t in tokens if not re.search(rf"(?<![\w-])--{re.escape(t)}\s*:", declarations)]
 
 
 def values(css: str) -> dict[str, str]:

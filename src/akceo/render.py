@@ -16,6 +16,8 @@ PLACEHOLDER = re.compile(r"__(TITLE|STYLE|SLIDES|SCRIPT|DIAGRAMS)__")
 
 ESCAPES = (("&", "&amp;"), ("<", "&lt;"), (">", "&gt;"), ("≥", "&ge;"), ("≤", "&le;"), ("·", "&middot;"))
 CODE = "\x00"  # brackets the index of a stashed `code` span, keeping it safe from the other inline rules
+LINK = "\x02"  # brackets the index of a stashed link, rendered on its own so no mark crosses its edge
+NEW_TAB = ' target="_blank" rel="noopener noreferrer"'
 
 
 def build(deck_path: Path, theme: str | None = None) -> tuple[str, int]:
@@ -30,6 +32,13 @@ def build(deck_path: Path, theme: str | None = None) -> tuple[str, int]:
             theme_css = themes.load(deck.config.get("theme", themes.DEFAULT), deck_path.parent)
         except DeckError as e:
             raise DeckError(f"{deck_path}: {e}") from None
+    unset = themes.missing(theme_css, themes.LINK_TOKENS) if deck.has_links() else []
+    if unset:
+        name = theme if theme is not None else deck.config.get("theme", themes.DEFAULT)
+        raise DeckError(
+            f"{deck_path}: theme {name} doesn't set {', '.join('--' + t for t in unset)}, which the "
+            "deck's links need"
+        )
     images_dir = deck_path.parent / Path(deck.config.get("images", ".")).expanduser()
 
     sections: list[str] = []
@@ -105,22 +114,36 @@ def escape(text: str) -> str:
 
 
 def inline(text: str) -> str:
-    """Render the inline markup: `code`, **bold**, ***strong***, ==accent==, ((dimmed)) and hard breaks."""
+    """Render the inline markup: `code`, [links](url), **bold**, ***strong***, ==accent==, ((dimmed))
+    and hard breaks. The parser has already checked every link's URL."""
     spans: list[str] = []
+    links: list[tuple[str, str]] = []
 
     def stash(match: re.Match[str]) -> str:
         spans.append(match.group(1))
         return CODE + str(len(spans) - 1) + CODE
 
+    def stash_link(match: re.Match[str]) -> str:
+        links.append((match.group(1), match.group(2)))
+        return LINK + str(len(links) - 1) + LINK
+
+    def marks(text: str) -> str:
+        text = escape(text)
+        text = re.sub(r"\*\*\*(.+?)\*\*\*", r'<b class="strong">\1</b>', text)
+        text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
+        text = re.sub(r"==(.+?)==", r'<span class="hl">\1</span>', text)
+        text = re.sub(r"\(\((.+?)\)\)", r'<span class="dim">(\1)</span>', text)
+        return re.sub(
+            CODE + r"(\d+)" + CODE, lambda m: "<code>" + escape(spans[int(m.group(1))]) + "</code>", text
+        )
+
+    def anchor(match: re.Match[str]) -> str:
+        label, url = links[int(match.group(1))]
+        return f'<a href="{html.escape(url)}"{"" if url.startswith("#") else NEW_TAB}>{marks(label)}</a>'
+
     text = re.sub(r"`([^`]+)`", stash, text)
-    text = escape(text)
-    text = re.sub(r"\*\*\*(.+?)\*\*\*", r'<b class="strong">\1</b>', text)
-    text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
-    text = re.sub(r"==(.+?)==", r'<span class="hl">\1</span>', text)
-    text = re.sub(r"\(\((.+?)\)\)", r'<span class="dim">(\1)</span>', text)
-    text = re.sub(
-        CODE + r"(\d+)" + CODE, lambda m: "<code>" + escape(spans[int(m.group(1))]) + "</code>", text
-    )
+    text = parse.LINK.sub(stash_link, text)
+    text = re.sub(LINK + r"(\d+)" + LINK, anchor, marks(text))
     return text.replace(BREAK, "<br>")
 
 

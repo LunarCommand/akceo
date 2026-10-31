@@ -24,6 +24,34 @@ def test_inline_escapes_html_and_protects_code():
     assert inline("`a` and **b**") == "<code>a</code> and <b>b</b>"
 
 
+def test_links_open_outside_targets_in_a_new_tab():
+    assert inline("[docs](https://x.example/a?b=1&c=2)") == (
+        '<a href="https://x.example/a?b=1&amp;c=2" target="_blank" rel="noopener noreferrer">docs</a>'
+    )
+    assert inline("[mail](mailto:a@b.example)") == (
+        '<a href="mailto:a@b.example" target="_blank" rel="noopener noreferrer">mail</a>'
+    )
+    assert inline("[slide 3](#3)") == '<a href="#3">slide 3</a>'
+
+
+def test_link_text_takes_marks_but_its_url_doesnt():
+    assert inline("[the **docs**](https://x.example)") == (
+        '<a href="https://x.example" target="_blank" rel="noopener noreferrer">the <b>docs</b></a>'
+    )
+    assert inline("[x](https://x.example/**a**==b==)") == (
+        '<a href="https://x.example/**a**==b==" target="_blank" rel="noopener noreferrer">x</a>'
+    )
+    assert inline("`[not](https://x.example)`") == "<code>[not](https://x.example)</code>"
+
+
+def test_a_mark_cant_cross_a_link_edge():
+    # Rendered with the link, these marks overlapped its tags: <b>a <a …>b</b> c</a>.
+    assert inline("**a [b** c](https://x.example)") == (
+        '**a <a href="https://x.example" target="_blank" rel="noopener noreferrer">b** c</a>'
+    )
+    assert inline("[a ==b](#1) c==") == '<a href="#1">a ==b</a> c=='
+
+
 def test_title_slide():
     html = slide_html("""
         layout: title

@@ -44,11 +44,14 @@ uv run akceo check examples/demo/deck.md
 
 ## Rules
 
-- The built HTML must not reference any external file or URL. The Content-Security-Policy in
-  `assets/page.html` enforces this in the browser; don't loosen it.
+- The built HTML must not load anything from outside the file. The Content-Security-Policy in
+  `assets/page.html` enforces this in the browser; don't loosen it. A link out of the deck loads
+  nothing, so it's allowed, and it always opens in a new tab.
 - `docs/syntax.md` is the format reference. Update it in the same change as any parser, renderer
   or token change.
-- A new theme token goes in `themes.TOKENS`, every built-in theme, and `docs/syntax.md`.
+- A new theme token goes in `themes.TOKENS`, every built-in theme, and `docs/syntax.md`. A token
+  only one feature needs, such as the link tokens, goes in that feature's own list instead
+  (`themes.LINK_TOKENS`), checked only for decks that use it.
 - `docs/how-it-works.md` describes the modules and pipeline. Update it when either changes.
 - Keep JavaScript escapes such as `\u0000` as text in the assets. A raw control character breaks
   the page, and a test checks for it.

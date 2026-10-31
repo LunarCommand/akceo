@@ -61,6 +61,13 @@ TABLE_ROW = re.compile(r"^(\|.*)$")
 BLOCK_START = re.compile(r"^(#{1,3} |- |> |\||\d+\. )")
 DELIMITER_CELL = re.compile(r"^:?-+:?$")
 STYLE_URL = re.compile(r"(url|image-set)\s*\(", re.IGNORECASE)
+CODE_SPAN = re.compile(r"`[^`]+`")
+LINK = re.compile(r"\[([^\]\n]+)\]\(([^)\n]*)\)")
+OUTSIDE_LINK = re.compile(r"(https?://|mailto:)[^\s\"'<>`\x01]+", re.IGNORECASE)  # \x01 is BREAK
+SLIDE_LINK = re.compile(r"#([0-9]+)")  # ASCII digits only, as deck.js reads the hash
+# C0 control characters, apart from tab, line feed, form feed and carriage return. The renderer
+# uses some as placeholders, and none of them belongs on a slide.
+CONTROL = re.compile(r"[\x00-\x08\x0b\x0e-\x1f]")
 
 
 @dataclass(frozen=True)
@@ -107,6 +114,9 @@ class Deck:
     def error(self, slide: Slide, message: str) -> DeckError:
         return _error(self.path, slide.line, f"slide {slide.number}: {message}")
 
+    def has_links(self) -> bool:
+        return any(LINK.search(_without_code(text)) for slide in self.slides for text in _slide_texts(slide))
+
 
 Entry = tuple[int, str, str]  # (line number, key, value)
 
@@ -116,6 +126,10 @@ def load(path: Path) -> Deck:
 
 
 def parse(text: str, path: Path) -> Deck:
+    control = CONTROL.search(text)
+    if control:
+        line = text.count("\n", 0, control.start()) + 1
+        raise _error(path, line, f"a control character (U+{ord(control.group()):04X}) can't be in a deck")
     chunks = _chunks(text)
     config_start, config_lines = chunks[0]
     entries, rest, _ = _split_header(config_start, config_lines)
@@ -139,7 +153,46 @@ def parse(text: str, path: Path) -> Deck:
             slides.append(_slide(path, len(slides) + 1, start, lines))
     if not slides:
         raise DeckError(f"{path}: the deck has no slides; start each slide after a --- line")
+    for slide in slides:
+        _check_links(path, slide, len(slides))
     return Deck(path, config, tuple(slides))
+
+
+def _slide_texts(slide: Slide) -> list[str]:
+    texts = [slide.meta.get("kicker", ""), slide.meta.get("meta", "")]
+    for block in slide.blocks:
+        texts += [block.text, block.body, *block.items, *(cell for row in block.rows for cell in row)]
+    return texts
+
+
+def _without_code(text: str) -> str:
+    """The text with each code span blanked to spaces of the same length. A label that is only code
+    still reads as a link, as it does to the renderer, a URL with code in it fails the check, and
+    positions still match the original text, for quoting it in errors."""
+    return CODE_SPAN.sub(lambda m: " " * len(m.group()), text)
+
+
+def _check_links(path: Path, slide: Slide, count: int) -> None:
+    """Every [text](url) must go to the web, to an email address, or to a slide in this deck. A
+    link inside a code span is code, not a link."""
+    for text in _slide_texts(slide):
+        for m in LINK.finditer(_without_code(text)):
+            url = m.group(2)
+            written = text[m.start(2) : m.end(2)]
+            if BREAK in url:
+                message = f"a link's URL can't continue onto the next line ('{written.replace(BREAK, '\\')}')"
+                raise _error(path, slide.line, f"slide {slide.number}: {message}")
+            slide_link = SLIDE_LINK.fullmatch(url)
+            if slide_link and not 1 <= int(slide_link.group(1)) <= count:
+                message = f"the link to {url} goes past the last slide, {count}"
+                raise _error(path, slide.line, f"slide {slide.number}: {message}")
+            if not slide_link and not OUTSIDE_LINK.fullmatch(url):
+                raise _error(
+                    path,
+                    slide.line,
+                    f"slide {slide.number}: can't link to '{written}'; a link goes to an https:, http: or "
+                    "mailto: address, or to a slide as #N",
+                )
 
 
 def _error(path: Path, line: int, message: str) -> DeckError:
