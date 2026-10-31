@@ -385,6 +385,7 @@ def test_allowed_links_parse(line: str):
         # A code span must not hide a link from the check: the renderer still makes one.
         ("[`run`](javascript:alert%281%29)", "can't link to 'javascript:alert%281%29'"),
         ("[docs](https://x.example/`part`)", "can't link to 'https://x.example/`part`'"),
+        ("[next](#\u0662)", "can't link to '#\u0662'"),
     ],
 )
 def test_bad_links_name_the_slide(text: str, message: str):
@@ -422,3 +423,14 @@ def test_control_characters_stop_the_build_with_their_line(char: str):
 def test_tabs_and_crlf_line_breaks_are_fine():
     d = parse("---\r\n## A\tB\r\n\r\n- item\r\n", Path("deck.md"))
     assert d.slides[0].blocks[0].text == "A\tB"
+
+
+def test_a_url_cant_continue_onto_the_next_line():
+    with pytest.raises(DeckError) as e:
+        parse("---\n## A\n\n- see [x](https://x.example/a\\\nb) now\n", Path("deck.md"))
+    assert (
+        str(e.value)
+        == "deck.md:2: slide 1: a link's URL can't continue onto the next line ('https://x.example/a\\b')"
+    )
+    # A hard break in the link text is fine.
+    assert deck("---\n## A\n\n- [two\\\nlines](https://x.example)\n").has_links()

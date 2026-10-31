@@ -63,8 +63,8 @@ DELIMITER_CELL = re.compile(r"^:?-+:?$")
 STYLE_URL = re.compile(r"(url|image-set)\s*\(", re.IGNORECASE)
 CODE_SPAN = re.compile(r"`[^`]+`")
 LINK = re.compile(r"\[([^\]\n]+)\]\(([^)\n]*)\)")
-OUTSIDE_LINK = re.compile(r"(https?://|mailto:)[^\s\"'<>`]+", re.IGNORECASE)
-SLIDE_LINK = re.compile(r"#(\d+)")
+OUTSIDE_LINK = re.compile(r"(https?://|mailto:)[^\s\"'<>`\x01]+", re.IGNORECASE)  # \x01 is BREAK
+SLIDE_LINK = re.compile(r"#([0-9]+)")  # ASCII digits only, as deck.js reads the hash
 # C0 control characters, apart from tab, line feed, form feed and carriage return. The renderer
 # uses some as placeholders, and none of them belongs on a slide.
 CONTROL = re.compile(r"[\x00-\x08\x0b\x0e-\x1f]")
@@ -179,6 +179,9 @@ def _check_links(path: Path, slide: Slide, count: int) -> None:
         for m in LINK.finditer(_without_code(text)):
             url = m.group(2)
             written = text[m.start(2) : m.end(2)]
+            if BREAK in url:
+                message = f"a link's URL can't continue onto the next line ('{written.replace(BREAK, '\\')}')"
+                raise _error(path, slide.line, f"slide {slide.number}: {message}")
             slide_link = SLIDE_LINK.fullmatch(url)
             if slide_link and not 1 <= int(slide_link.group(1)) <= count:
                 message = f"the link to {url} goes past the last slide, {count}"
