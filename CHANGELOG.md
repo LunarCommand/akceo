@@ -5,8 +5,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Links: `[text](url)` in any slide text. A link goes to an `https:`, `http:` or `mailto:`
+  address, always in a new tab, or to a slide in the deck as `#N`. Anything else, or a link to
+  a slide that doesn't exist, stops the build. Clicking a link follows it without changing the
+  slide.
+- Three theme tokens style links: `--link`, `--link-hover` and `--link-underline`. Both built-in
+  themes set them. A custom theme needs them only for a deck that has links; without them, that
+  deck's build stops and names the missing ones.
+
 ### Fixed
 
+- A control character in a deck, such as a stray NUL, stops the build with its line. It
+  used to crash with a Python traceback, or put invisible characters on the slide.
 - Ctrl-C during a command prints `akceo: interrupted` and exits with code 130, instead of
   a Python traceback.
 

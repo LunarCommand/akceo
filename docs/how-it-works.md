@@ -99,7 +99,8 @@ kicker: The problem
 
 There are six layouts: `title`, `bullets`, `split` (image beside text), `steps`, `table` and
 `image` (an image on its own, with an optional heading and caption).
-The inline marks are small: bold, a strong color, an accent color, dimmed asides and code.
+The inline marks are small: bold, a strong color, an accent color, dimmed asides, code and
+links.
 
 ### Building
 
@@ -422,7 +423,7 @@ Anything else is a bug in Akceo, and it shows a normal Python traceback.
 
 `deck.js` is small. It shows one slide at a time by toggling an `active` class,
 moves the progress bar and counter, and maps keys and clicks to next and previous. A click is
-ignored while text is selected. On load it opens the slide named in the URL hash. On each move
+ignored while text is selected, and on a link, which it follows instead. On load it opens the slide named in the URL hash. On each move
 it writes the new number back with `history.replaceState`, so stepping through slides doesn't
 fill the browser history. A hash typed into the address bar moves to that slide.
 

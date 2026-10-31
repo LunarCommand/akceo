@@ -6,6 +6,9 @@
   --muted: #5f6672;
   --strong: #0b0d10;
   --accent: #0f766e;
+  --link: #0f766e;
+  --link-hover: #115e59;
+  --link-underline: underline 1px;
   --accent2: #b45309;
   --figure-bg: #fff;
   --figure-shadow: 0 8px 28px rgba(28,31,36,.14);

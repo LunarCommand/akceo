@@ -27,7 +27,7 @@ document.addEventListener('keydown', function(e){
   }
 });
 document.addEventListener('click', function(e){
-  if (String(window.getSelection())) return;
+  if (String(window.getSelection()) || e.target.closest('a')) return;
   if (e.clientX > window.innerWidth * 0.5) go(i + 1); else go(i - 1);
 });
 go(fromHash());

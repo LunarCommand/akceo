@@ -13,6 +13,9 @@ from akceo.cli import main
 ROOT = Path(__file__).parents[1]
 DEMO = ROOT / "examples" / "demo"
 EXTERNAL_REF = re.compile(r"""(src|href)=["']?(https?:|//|\.{0,2}/)|<link|@import|url\(""")
+# A link out of the deck loads nothing into it, so it's allowed, as long as it opens in a new tab.
+# The external-reference checks run on the page with those links taken out.
+OUTSIDE_LINK = re.compile(r'<a href="(?:https?|mailto):[^"]*"( target="_blank" rel="noopener noreferrer")?>')
 # The page carries Mermaid packed, so the full check reads everything else in it. Mermaid itself
 # holds url(#marker) references inside its SVGs and CSS keywords such as @import as strings, so,
 # unpacked, it gets a narrower check of its own: nothing that would load from outside. The browser
@@ -45,8 +48,10 @@ def test_builds_the_demo_deck_self_contained(tmp_path: Path, capsys: pytest.Capt
     assert page.count('<div class="diagram bare"') == 1
     assert len(PACKED.findall(page)) == 1
     assert page.count("/*! Mermaid ") == 1
-    assert not EXTERNAL_REF.search(page)
-    assert not OUTSIDE_LOAD.search(unpacked(page))
+    links = OUTSIDE_LINK.findall(page)
+    assert links and all(links), "every link out of the deck opens in a new tab"
+    assert not EXTERNAL_REF.search(OUTSIDE_LINK.sub("", page))
+    assert not OUTSIDE_LOAD.search(OUTSIDE_LINK.sub("", unpacked(page)))
     assert "Author note" not in page
 
 
@@ -112,6 +117,26 @@ def test_diagram_frames_pick_the_colors(tmp_path: Path):
     assert page.count("/*! Mermaid") == 1
     assert page.count('<script type="application/octet-stream" id="mermaid-packed">') == 1
     assert '<script type="application/json" id="mermaid-theme">{"theme": "base", ' in page
+
+
+def test_a_theme_needs_the_link_tokens_only_for_a_deck_with_links(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    tokens = ("bg", "line", "text", "muted", "strong", "accent", "accent2", "figure-bg", "figure-shadow")
+    (tmp_path / "old.css").write_text(
+        ":root {\n" + "".join(f"  --{t}: #000;\n" for t in (*tokens, "font", "mono", "link")) + "}\n"
+    )
+    deck = tmp_path / "deck.md"
+    deck.write_text("theme: old.css\n---\n## A\n\n- see `[code](https://x.example)`\n")
+    assert main(["build", str(deck)]) == 0
+    capsys.readouterr()
+
+    deck.write_text("theme: old.css\n---\n## A\n\n- see [the docs](https://x.example)\n")
+    assert main(["build", str(deck)]) == 1
+    assert capsys.readouterr().err == (
+        f"akceo: {deck}: theme old.css doesn't set --link-hover, --link-underline, which the deck's "
+        "links need\n"
+    )
 
 
 def test_errors_exit_1_with_a_message(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
