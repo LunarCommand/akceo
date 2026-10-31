@@ -112,9 +112,7 @@ class Deck:
         return _error(self.path, slide.line, f"slide {slide.number}: {message}")
 
     def has_links(self) -> bool:
-        return any(
-            LINK.search(CODE_SPAN.sub("", text)) for slide in self.slides for text in _slide_texts(slide)
-        )
+        return any(LINK.search(_without_code(text)) for slide in self.slides for text in _slide_texts(slide))
 
 
 Entry = tuple[int, str, str]  # (line number, key, value)
@@ -160,12 +158,20 @@ def _slide_texts(slide: Slide) -> list[str]:
     return texts
 
 
+def _without_code(text: str) -> str:
+    """The text with each code span blanked to spaces of the same length. A label that is only code
+    still reads as a link, as it does to the renderer, a URL with code in it fails the check, and
+    positions still match the original text, for quoting it in errors."""
+    return CODE_SPAN.sub(lambda m: " " * len(m.group()), text)
+
+
 def _check_links(path: Path, slide: Slide, count: int) -> None:
     """Every [text](url) must go to the web, to an email address, or to a slide in this deck. A
     link inside a code span is code, not a link."""
     for text in _slide_texts(slide):
-        for m in LINK.finditer(CODE_SPAN.sub("", text)):
+        for m in LINK.finditer(_without_code(text)):
             url = m.group(2)
+            written = text[m.start(2) : m.end(2)]
             slide_link = SLIDE_LINK.fullmatch(url)
             if slide_link and not 1 <= int(slide_link.group(1)) <= count:
                 message = f"the link to {url} goes past the last slide, {count}"
@@ -174,7 +180,7 @@ def _check_links(path: Path, slide: Slide, count: int) -> None:
                 raise _error(
                     path,
                     slide.line,
-                    f"slide {slide.number}: can't link to '{url}'; a link goes to an https:, http: or "
+                    f"slide {slide.number}: can't link to '{written}'; a link goes to an https:, http: or "
                     "mailto: address, or to a slide as #N",
                 )
 

@@ -382,6 +382,9 @@ def test_allowed_links_parse(line: str):
         ("[x](https://x.example/a b)", "can't link to 'https://x.example/a b'"),
         ("[x](#0)", "the link to #0 goes past the last slide, 2"),
         ("[x](#3)", "the link to #3 goes past the last slide, 2"),
+        # A code span must not hide a link from the check: the renderer still makes one.
+        ("[`run`](javascript:alert%281%29)", "can't link to 'javascript:alert%281%29'"),
+        ("[docs](https://x.example/`part`)", "can't link to 'https://x.example/`part`'"),
     ],
 )
 def test_bad_links_name_the_slide(text: str, message: str):
@@ -401,3 +404,9 @@ def test_links_are_checked_in_every_text_a_slide_shows():
     ):
         with pytest.raises(DeckError, match="can't link to 'ftp://x'"):
             parse(source, Path("deck.md"))
+
+
+def test_a_link_whose_label_is_code_counts_as_a_link():
+    d = deck("---\n## A\n\n- [`akceo build`](https://x.example)\n")
+    assert d.has_links()
+    assert not deck("---\n## A\n\n- `[not a link](https://x.example)`\n").has_links()
