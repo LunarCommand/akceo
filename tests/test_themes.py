@@ -17,7 +17,8 @@ def test_builtin_themes_and_descriptions():
 
 @pytest.mark.parametrize("name", ["midnight", "paper"])
 def test_builtin_themes_set_every_token(name: str):
-    assert themes.load(name, Path("/unused"))
+    css = themes.load(name, Path("/unused"))
+    assert themes.missing(css, themes.LINK_TOKENS) == []
 
 
 def test_theme_file_resolves_against_base(tmp_path: Path):

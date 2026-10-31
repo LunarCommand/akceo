@@ -29,6 +29,9 @@ ul { list-style: none; display: flex; flex-direction: column; gap: 1.5vh; margin
 li { font-size: clamp(15px, 1.9vw, 24px); line-height: 1.34; padding-left: 1.4em; position: relative; max-width: 60ch; }
 li::before { content: "▸"; color: var(--accent); position: absolute; left: 0; top: 0; }
 li b { color: var(--strong); }
+/* Slide text only: Mermaid draws its own <a> elements for diagram links. */
+a:not(svg a) { color: var(--link); text-decoration: var(--link-underline); text-underline-offset: .15em; }
+a:not(svg a):hover, a:not(svg a):focus-visible { color: var(--link-hover); }
 code { font-family: var(--mono); color: var(--accent2); font-size: .92em; }
 .split { display: grid; grid-template-columns: 1fr 1fr; gap: 4vw; align-items: center; height: 100%; }
 .split.img-wide { grid-template-columns: 1.35fr 1fr; }
@@ -87,6 +90,9 @@ td:first-child b { color: var(--strong); }
   --muted: #93a4bd;
   --strong: #fff;
   --accent: #5eead4;
+  --link: #5eead4;
+  --link-hover: #99f6e4;
+  --link-underline: underline 1px;
   --accent2: #fbbf24;
   --figure-bg: #fff;
   --figure-shadow: 0 12px 40px rgba(0,0,0,.5);
@@ -125,6 +131,7 @@ td:first-child b { color: var(--strong); }
       <li><code>**bold**</code> gives <b>bold</b>, and <code>***strong***</code> gives <b class="strong">strong</b>.</li>
       <li><code>==accent==</code> gives <span class="hl">accent</span>, and <code>((dim))</code> gives <span class="dim">(a muted aside)</span>.</li>
       <li>Backticks give code, and markup inside them stays literal: <code>==like this==</code>.</li>
+      <li><code>[text](url)</code> links out, as to the <a href="https://github.com/LunarCommand/akceo/blob/main/docs/syntax.md" target="_blank" rel="noopener noreferrer">format reference</a>, in a new tab. <code>[text](#7)</code> jumps to a slide, such as <a href="#7">the image layout</a>.</li>
       <li>Indent a line by two spaces to wrap a long item across lines in the source without breaking it on the slide.</li>
     </ul>
   </section>
@@ -228,7 +235,7 @@ document.addEventListener('keydown', function(e){
   }
 });
 document.addEventListener('click', function(e){
-  if (String(window.getSelection())) return;
+  if (String(window.getSelection()) || e.target.closest('a')) return;
   if (e.clientX > window.innerWidth * 0.5) go(i + 1); else go(i - 1);
 });
 go(fromHash());
