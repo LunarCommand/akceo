@@ -410,3 +410,15 @@ def test_a_link_whose_label_is_code_counts_as_a_link():
     d = deck("---\n## A\n\n- [`akceo build`](https://x.example)\n")
     assert d.has_links()
     assert not deck("---\n## A\n\n- `[not a link](https://x.example)`\n").has_links()
+
+
+@pytest.mark.parametrize("char", ["\x00", "\x02", "\x03", "\x1b"])
+def test_control_characters_stop_the_build_with_their_line(char: str):
+    with pytest.raises(DeckError) as e:
+        parse(f"---\n## A\n\n- ok {char}7{char} here\n", Path("deck.md"))
+    assert str(e.value) == f"deck.md:4: a control character (U+{ord(char):04X}) can't be in a deck"
+
+
+def test_tabs_and_crlf_line_breaks_are_fine():
+    d = parse("---\r\n## A\tB\r\n\r\n- item\r\n", Path("deck.md"))
+    assert d.slides[0].blocks[0].text == "A\tB"

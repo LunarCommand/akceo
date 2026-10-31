@@ -65,6 +65,9 @@ CODE_SPAN = re.compile(r"`[^`]+`")
 LINK = re.compile(r"\[([^\]\n]+)\]\(([^)\n]*)\)")
 OUTSIDE_LINK = re.compile(r"(https?://|mailto:)[^\s\"'<>`]+", re.IGNORECASE)
 SLIDE_LINK = re.compile(r"#(\d+)")
+# C0 control characters, apart from tab, line feed, form feed and carriage return. The renderer
+# uses some as placeholders, and none of them belongs on a slide.
+CONTROL = re.compile(r"[\x00-\x08\x0b\x0e-\x1f]")
 
 
 @dataclass(frozen=True)
@@ -123,6 +126,10 @@ def load(path: Path) -> Deck:
 
 
 def parse(text: str, path: Path) -> Deck:
+    control = CONTROL.search(text)
+    if control:
+        line = text.count("\n", 0, control.start()) + 1
+        raise _error(path, line, f"a control character (U+{ord(control.group()):04X}) can't be in a deck")
     chunks = _chunks(text)
     config_start, config_lines = chunks[0]
     entries, rest, _ = _split_header(config_start, config_lines)

@@ -21,8 +21,9 @@ ul { list-style: none; display: flex; flex-direction: column; gap: 1.5vh; margin
 li { font-size: clamp(15px, 1.9vw, 24px); line-height: 1.34; padding-left: 1.4em; position: relative; max-width: 60ch; }
 li::before { content: "▸"; color: var(--accent); position: absolute; left: 0; top: 0; }
 li b { color: var(--strong); }
-a { color: var(--link); text-decoration: var(--link-underline); text-underline-offset: .15em; }
-a:hover, a:focus-visible { color: var(--link-hover); }
+/* Slide text only: Mermaid draws its own <a> elements for diagram links. */
+a:not(svg a) { color: var(--link); text-decoration: var(--link-underline); text-underline-offset: .15em; }
+a:not(svg a):hover, a:not(svg a):focus-visible { color: var(--link-hover); }
 code { font-family: var(--mono); color: var(--accent2); font-size: .92em; }
 .split { display: grid; grid-template-columns: 1fr 1fr; gap: 4vw; align-items: center; height: 100%; }
 .split.img-wide { grid-template-columns: 1.35fr 1fr; }

@@ -133,7 +133,8 @@ A link goes to one of these, and anything else stops the build:
   the deck stays open.
 - a slide in the deck, as `#N`, such as `[back to the plan](#3)`. The slide must exist.
 
-A URL can't contain a space, a quote or `)`. Write `%20` for a space and `%29` for `)`.
+A URL can't contain a space, a quote or `)`. Write `%20` for a space and `%29` for `)`. The
+link text can't contain `]`; a link written with one shows as plain text.
 Clicking a link follows it without changing the slide.
 
 ## Images

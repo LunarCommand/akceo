@@ -17,6 +17,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A control character in a deck, such as a stray NUL, stops the build with its line. It
+  used to crash with a Python traceback, or put invisible characters on the slide.
 - Ctrl-C during a command prints `akceo: interrupted` and exits with code 130, instead of
   a Python traceback.
 
