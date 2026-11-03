@@ -65,9 +65,10 @@ CODE_SPAN = re.compile(r"`[^`]+`")
 LINK = re.compile(r"\[([^\]\n]+)\]\(([^)\n]*)\)")
 OUTSIDE_LINK = re.compile(r"(https?://|mailto:)[^\s\"'<>`\x01]+", re.IGNORECASE)  # \x01 is BREAK
 SLIDE_LINK = re.compile(r"#([0-9]+)")  # ASCII digits only, as deck.js reads the hash
-# Pixel counts take ASCII digits only. str.isdigit() also passes digits such as "²", which int() rejects.
-PIXELS = re.compile(r"[0-9]+")
-CROP = re.compile(r"([0-9]+)" + r"(?:\s*,\s*|\s+)([0-9]+)" * 3)
+# Pixel counts take at most nine ASCII digits. str.isdigit() also passes digits such as "²", which
+# int() rejects, and int() refuses a string past its digit limit.
+PIXELS = re.compile(r"[0-9]{1,9}")
+CROP = re.compile(r"([0-9]{1,9})" + r"(?:\s*,\s*|\s+)([0-9]{1,9})" * 3)
 # C0 control characters, apart from tab, line feed, form feed and carriage return. The renderer
 # uses some as placeholders, and none of them belongs on a slide.
 CONTROL = re.compile(r"[\x00-\x08\x0b\x0e-\x1f]")

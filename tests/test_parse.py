@@ -327,6 +327,22 @@ def test_image_layout_takes_image_keys_and_needs_no_content():
     assert deck("---\nlayout: image\n").slides[0].meta == {"layout": "image"}
 
 
+@pytest.mark.parametrize("digits", [10, 5000])
+@pytest.mark.parametrize(
+    ("header", "message"),
+    [
+        ("image-max: {}", "'image-max' must be a positive whole"),
+        ("image-crop: 0, 0, {}, 10", "'image-crop' must be four whole"),
+    ],
+)
+def test_pixel_counts_take_at_most_nine_digits(header: str, message: str, digits: int):
+    # 5,000 digits is past int()'s default limit, where int() raises ValueError instead of
+    # returning a number, so this case fails with a traceback unless the pattern refuses it first.
+    with pytest.raises(DeckError, match=message):
+        deck(f"---\nlayout: image\nimage: x.png\n{header.format('9' * digits)}\n")
+    deck(f"---\nlayout: image\nimage: x.png\n{header.format('9' * 9)}\n")
+
+
 @pytest.mark.parametrize("value", ["120, 80, 920, 580", "120 80 920 580", "120,80 , 920   580"])
 def test_image_crop_takes_commas_or_spaces(value: str):
     d = deck(f"---\nlayout: image\nimage: x.png\nimage-crop: {value}\n")

@@ -24,8 +24,8 @@ All notable changes to this project are documented here. The format follows
   used to crash with a Python traceback, or put invisible characters on the slide.
 - Ctrl-C during a command prints `akceo: interrupted` and exits with code 130, instead of
   a Python traceback.
-- An `image-max` with a digit outside ASCII, such as `8²`, stops the build with a message. It
-  used to crash with a Python traceback.
+- An `image-max` with a digit outside ASCII, such as `8²`, or with thousands of digits, stops
+  the build with a message. It used to crash with a Python traceback.
 
 ## [0.2.1] - 2026-10-30
 
