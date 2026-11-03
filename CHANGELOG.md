@@ -14,6 +14,9 @@ All notable changes to this project are documented here. The format follows
 - Three theme tokens style links: `--link`, `--link-hover` and `--link-underline`. Both built-in
   themes set them. A custom theme needs them only for a deck that has links; without them, that
   deck's build stops and names the missing ones.
+- `image-crop: left, top, right, bottom` on split and image slides keeps only that part of a
+  PNG, JPEG or WebP image, in pixels, before it's shrunk to `image-max`. A crop past the image's
+  edge stops the build and gives the image's size.
 
 ### Fixed
 

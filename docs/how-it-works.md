@@ -245,7 +245,7 @@ sequenceDiagram
             R->>M: diagram source
             M-->>R: ok, or DeckError with the diagram's line
         else any other image
-            R->>I: image path, image-max
+            R->>I: image path, image-max, image-crop
             I-->>R: data URI
         end
     end
@@ -358,7 +358,7 @@ flowchart TD
     svg -->|yes| raw["Embed the bytes unchanged"]
     svg -->|no| fmt{"PNG, JPEG or WebP?"}
     fmt -->|no| e2["DeckError: unsupported format"]
-    fmt -->|yes| fix["Rotate upright from EXIF,<br/>shrink to image-max,<br/>never enlarge"]
+    fmt -->|yes| fix["Rotate upright from EXIF,<br/>crop to image-crop,<br/>shrink to image-max,<br/>never enlarge"]
     fix --> save["Re-save in the same format<br/>(JPEG and WebP at quality 90)"]
     raw --> uri["base64 data: URI in the img src"]
     save --> uri

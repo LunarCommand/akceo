@@ -54,6 +54,7 @@ A slide starts with `key: value` header lines. Then comes a blank line, then the
 | `image` | split, image | Image file, relative to the `images` folder. Leave it out to show a dashed placeholder while the image doesn't exist yet. |
 | `image-alt` | split, image | Alt text for the image. |
 | `image-max` | split, image | Longest side in pixels after shrinking. Default `2400`. |
+| `image-crop` | split, image | Keep only part of the image: `left, top, right, bottom` in pixels, such as `120, 80, 920, 580`. Commas or spaces separate the numbers. See [Images](#images). |
 | `image-wide` | split | `yes` gives the image the wider column. |
 | `image-frame` | split, image | `yes` or `no` for this slide's image, overriding the deck's `image-frame`. |
 | `dim-last-column` | table | `yes` shows the last column in muted text. |
@@ -141,14 +142,19 @@ Clicking a link follows it without changing the slide.
 
 The `split` and `image` layouts embed their image in the page.
 
-- **PNG, JPEG and WebP** are shrunk so the longest side is at most `image-max`. Smaller images
-  are never enlarged. JPEG and WebP are re-saved at quality 90 and turned upright using their
-  EXIF orientation.
+- **PNG, JPEG and WebP** are turned upright using their EXIF orientation, cropped to
+  `image-crop` if it's set, then shrunk so the longest side is at most `image-max`. Smaller
+  images are never enlarged. JPEG and WebP are re-saved at quality 90.
 - **SVG** is embedded unchanged.
 - **Mermaid** diagrams in a `.mmd` file are drawn as SVG by the page when it opens. akceo
   includes Mermaid, so nothing else needs installing. See [Mermaid diagrams](#mermaid-diagrams).
 
 Other formats stop the build.
+
+`image-crop` gives the two corners of the part to keep, counted in pixels from the top-left of
+the image as it appears, upright. `image-crop: 120, 80, 920, 580` keeps an 800 by 500 area. A
+crop that goes past the image's edge stops the build and gives the image's size. SVG and Mermaid
+diagrams can't be cropped.
 
 ### Mermaid diagrams
 

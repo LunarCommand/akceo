@@ -83,3 +83,43 @@ def test_unreadable_file(tmp_path: Path):
     (tmp_path / "a.png").write_text("not an image")
     with pytest.raises(DeckError, match="not a readable image"):
         data_uri(tmp_path / "a.png", 100)
+
+
+def halves(path: Path, size: tuple[int, int], fmt: str = "PNG") -> Path:
+    """An image whose left half is red and right half is blue."""
+    image = Image.new("RGB", size, (255, 0, 0))
+    image.paste((0, 0, 255), (size[0] // 2, 0, size[0], size[1]))
+    image.save(path, format=fmt)
+    return path
+
+
+def test_crop_comes_before_the_shrink(tmp_path: Path):
+    # Shrinking first would leave a 100 by 50 image, which the crop goes past.
+    _, data = decode(data_uri(halves(tmp_path / "a.png", (400, 200)), 100, (200, 0, 400, 200)))
+    with Image.open(io.BytesIO(data)) as im:
+        assert im.size == (100, 100)
+        assert im.convert("RGB").getpixel((50, 50)) == (0, 0, 255)
+
+
+def test_crop_measures_the_upright_image(tmp_path: Path):
+    # Stored 300 by 100 and rotated by EXIF to stand 100 by 300. The crop fits only the upright
+    # image, so cropping before turning it upright fails.
+    exif = Image.Exif()
+    exif[0x0112] = 6
+    Image.new("RGB", (300, 100), (200, 30, 30)).save(tmp_path / "a.jpg", format="JPEG", exif=exif)
+    _, data = decode(data_uri(tmp_path / "a.jpg", 1000, (0, 0, 100, 250)))
+    with Image.open(io.BytesIO(data)) as im:
+        assert im.size == (100, 250)
+
+
+def test_crop_past_the_edge_gives_the_image_size(tmp_path: Path):
+    path = save(tmp_path / "a.png", (400, 200), "PNG")
+    with pytest.raises(DeckError) as e:
+        data_uri(path, 100, (0, 0, 400, 201))
+    assert str(e.value) == f"the crop 0, 0, 400, 201 goes past the edge of {path}, which is 400 by 200 pixels"
+
+
+def test_svg_cant_be_cropped(tmp_path: Path):
+    (tmp_path / "a.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg"/>')
+    with pytest.raises(DeckError, match="can't crop an SVG image: .*a.svg"):
+        data_uri(tmp_path / "a.svg", 100, (0, 0, 10, 10))

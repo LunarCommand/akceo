@@ -15,10 +15,10 @@ COMMON_KEYS = ("layout", "kicker", *STYLE_KEYS)
 LAYOUT_KEYS: dict[str, tuple[str, ...]] = {
     "title": ("meta",),
     "bullets": (),
-    "split": ("image", "image-alt", "image-max", "image-wide", "image-frame"),
+    "split": ("image", "image-alt", "image-max", "image-crop", "image-wide", "image-frame"),
     "steps": (),
     "table": ("dim-last-column",),
-    "image": ("image", "image-alt", "image-max", "image-frame"),
+    "image": ("image", "image-alt", "image-max", "image-crop", "image-frame"),
 }
 FLAG_KEYS = ("image-wide", "dim-last-column", "image-frame")
 
@@ -65,6 +65,7 @@ CODE_SPAN = re.compile(r"`[^`]+`")
 LINK = re.compile(r"\[([^\]\n]+)\]\(([^)\n]*)\)")
 OUTSIDE_LINK = re.compile(r"(https?://|mailto:)[^\s\"'<>`\x01]+", re.IGNORECASE)  # \x01 is BREAK
 SLIDE_LINK = re.compile(r"#([0-9]+)")  # ASCII digits only, as deck.js reads the hash
+CROP = re.compile(r"([0-9]+)" + r"(?:\s*,\s*|\s+)([0-9]+)" * 3)
 # C0 control characters, apart from tab, line feed, form feed and carriage return. The renderer
 # uses some as placeholders, and none of them belongs on a slide.
 CONTROL = re.compile(r"[\x00-\x08\x0b\x0e-\x1f]")
@@ -256,6 +257,8 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
             raise fail(f"'{key}' must be yes or no, not '{value}'", line)
         if key == "image-max" and not (value.isdigit() and int(value) > 0):
             raise fail(f"'image-max' must be a positive whole number of pixels, not '{value}'", line)
+        if key == "image-crop" and (problem := _crop_problem(meta.get("image", ""), value)):
+            raise fail(problem, line)
         if key in STYLE_KEYS and STYLE_URL.search(value):
             raise fail(f"'{key}' can't reference files or URLs (url() or image-set())", line)
 
@@ -275,6 +278,30 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
             raise fail(f"the {layout} layout needs {BLOCK_NAMES[kind]}")
 
     return Slide(number, first, meta, tuple(blocks))
+
+
+def crop_box(value: str) -> tuple[int, int, int, int] | None:
+    """An image-crop value as (left, top, right, bottom), or None if it isn't four whole numbers."""
+    m = CROP.fullmatch(value.strip())
+    if not m:
+        return None
+    left, top, right, bottom = map(int, m.groups())
+    return left, top, right, bottom
+
+
+def _crop_problem(image: str, value: str) -> str | None:
+    box = crop_box(value)
+    if box is None:
+        return (
+            "'image-crop' must be four whole numbers of pixels, left, top, right and bottom, such as "
+            f"120, 80, 920, 580, not '{value}'"
+        )
+    left, top, right, bottom = box
+    if right <= left or bottom <= top:
+        return f"'image-crop' {value} is empty: right must be past left, and bottom below top"
+    if image.lower().endswith((".svg", ".mmd")):
+        return f"'image-crop' only works on PNG, JPEG and WebP images, not {image}"
+    return None
 
 
 def _join(names: list[str]) -> str:

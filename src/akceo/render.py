@@ -71,8 +71,9 @@ def _image_src(deck: Deck, slide: Slide, images_dir: Path) -> str:
     if "image" not in slide.meta or _is_diagram(slide):
         return ""
     max_px = int(slide.meta.get("image-max", DEFAULT_IMAGE_MAX))
+    crop = parse.crop_box(slide.meta.get("image-crop", ""))
     try:
-        return images.data_uri(images_dir / slide.meta["image"], max_px)
+        return images.data_uri(images_dir / slide.meta["image"], max_px, crop)
     except DeckError as e:
         raise deck.error(slide, str(e)) from None
 

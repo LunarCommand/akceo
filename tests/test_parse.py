@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from akceo.errors import DeckError
-from akceo.parse import BREAK, Block, Deck, load, parse
+from akceo.parse import BREAK, Block, Deck, crop_box, load, parse
 
 
 def deck(text: str) -> Deck:
@@ -191,6 +191,28 @@ def test_paragraph_starting_like_a_block_marker_terminates():
             "'image-max' must be a positive whole",
         ),
         (
+            "---\nlayout: split\nimage: x.png\nimage-crop: 0, 0, 800\n\n## A\n",
+            "deck.md:4: slide 1: 'image-crop' must be four whole numbers of pixels, left, top, right and "
+            "bottom, such as 120, 80, 920, 580, not '0, 0, 800'",
+        ),
+        # Full-width digits pass str.isdigit(), and int() reads them, but they aren't a pixel count.
+        ("---\nlayout: image\nimage: x.png\nimage-crop: 0, 0, \uff18\uff10, 60\n", "must be four whole"),
+        ("---\nlayout: image\nimage: x.png\nimage-crop: 0, 0, -8, 60\n", "must be four whole"),
+        (
+            "---\nlayout: image\nimage: x.png\nimage-crop: 80, 0, 80, 60\n",
+            "'image-crop' 80, 0, 80, 60 is empty: right must be past left, and bottom below top",
+        ),
+        ("---\nlayout: image\nimage: x.png\nimage-crop: 0, 60, 80, 50\n", "is empty"),
+        (
+            "---\nlayout: image\nimage: chart.SVG\nimage-crop: 0, 0, 80, 60\n",
+            "'image-crop' only works on PNG, JPEG and WebP images, not chart.SVG",
+        ),
+        ("---\nlayout: image\nimage: flow.mmd\nimage-crop: 0, 0, 80, 60\n", "not flow.mmd"),
+        (
+            "---\nimage-crop: 0, 0, 80, 60\n\n## A\n",
+            "'image-crop' only applies to the split and image layouts",
+        ),
+        (
             "---\nkicker: K\nstyle-h2: background:URL (https://x.test/a.png)\n\n## A\n",
             "deck.md:3: slide 1: 'style-h2' can't reference files or URLs",
         ),
@@ -299,6 +321,12 @@ def test_image_layout_takes_image_keys_and_needs_no_content():
     assert d.slides[0].layout == "image"
     assert d.slides[0].blocks == ()
     assert deck("---\nlayout: image\n").slides[0].meta == {"layout": "image"}
+
+
+@pytest.mark.parametrize("value", ["120, 80, 920, 580", "120 80 920 580", "120,80 , 920   580"])
+def test_image_crop_takes_commas_or_spaces(value: str):
+    d = deck(f"---\nlayout: image\nimage: x.png\nimage-crop: {value}\n")
+    assert crop_box(d.slides[0].meta["image-crop"]) == (120, 80, 920, 580)
 
 
 def test_image_layout_takes_a_heading_and_a_caption():
