@@ -65,6 +65,8 @@ CODE_SPAN = re.compile(r"`[^`]+`")
 LINK = re.compile(r"\[([^\]\n]+)\]\(([^)\n]*)\)")
 OUTSIDE_LINK = re.compile(r"(https?://|mailto:)[^\s\"'<>`\x01]+", re.IGNORECASE)  # \x01 is BREAK
 SLIDE_LINK = re.compile(r"#([0-9]+)")  # ASCII digits only, as deck.js reads the hash
+# Pixel counts take ASCII digits only. str.isdigit() also passes digits such as "²", which int() rejects.
+PIXELS = re.compile(r"[0-9]+")
 CROP = re.compile(r"([0-9]+)" + r"(?:\s*,\s*|\s+)([0-9]+)" * 3)
 # C0 control characters, apart from tab, line feed, form feed and carriage return. The renderer
 # uses some as placeholders, and none of them belongs on a slide.
@@ -255,7 +257,7 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
             raise fail(f"'{key}' only applies to the {_join(owners)} {noun}", line)
         if key in FLAG_KEYS and value not in ("yes", "no"):
             raise fail(f"'{key}' must be yes or no, not '{value}'", line)
-        if key == "image-max" and not (value.isdigit() and int(value) > 0):
+        if key == "image-max" and not (PIXELS.fullmatch(value) and int(value) > 0):
             raise fail(f"'image-max' must be a positive whole number of pixels, not '{value}'", line)
         if key == "image-crop" and (problem := _crop_problem(meta.get("image", ""), value)):
             raise fail(problem, line)

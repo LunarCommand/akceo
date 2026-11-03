@@ -190,6 +190,10 @@ def test_paragraph_starting_like_a_block_marker_terminates():
             "---\nlayout: split\nimage: x.png\nimage-max: big\n\n## A\n",
             "'image-max' must be a positive whole",
         ),
+        # "²" passes str.isdigit(), and int() raises on it. Full-width digits pass both.
+        ("---\nlayout: image\nimage: x.png\nimage-max: 8\u00b2\n", "'image-max' must be a positive whole"),
+        ("---\nlayout: image\nimage: x.png\nimage-max: \uff18\uff10\n", "must be a positive whole"),
+        ("---\nlayout: image\nimage: x.png\nimage-max: 0\n", "'image-max' must be a positive whole"),
         (
             "---\nlayout: split\nimage: x.png\nimage-crop: 0, 0, 800\n\n## A\n",
             "deck.md:4: slide 1: 'image-crop' must be four whole numbers of pixels, left, top, right and "
