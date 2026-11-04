@@ -152,6 +152,9 @@ def test_what_mermaid_doesnt_read_as_an_image_is_left_alone(inline: Inline, tmp_
 @pytest.mark.parametrize(
     "source",
     [
+        # The label names the same file as the real image, and stays as it is.
+        'flowchart LR\n  a["see @{ img: shot.png }"] --> b@{ img: "shot.png" }\n',
+        'flowchart LR\n  a -- see @{ img: shot.png } --> b@{ img: "shot.png" }\n',
         # Front matter and directives aren't scanned: here they'd open a string or edge text.
         '---\ntitle: The "new -- form\n---\nflowchart LR\n  b@{ img: "shot.png" }\n',
         '%%{init: {"themeCSS": ".x { fill: var(--c) }"}}%%\nflowchart LR\n  b@{ img: "shot.png" }\n',

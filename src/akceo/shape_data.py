@@ -6,14 +6,32 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 
 # Mermaid's flowchart lexer ends shape data at the first } outside a double-quoted string; a single
-# quote doesn't protect one (src/diagrams/flowchart/parser/flow.jison). Its YAML then reads the data
-# as a flow mapping when there's no line break outside the quotes, and as a block mapping when there
-# is (addVertex in src/diagrams/flowchart/flowDb.ts).
+# quote doesn't protect one. It turns a line break inside such a string into <br/>
+# (src/diagrams/flowchart/parser/flow.jison). Its YAML then reads the data as a flow mapping when no
+# line break is left, and as a block mapping when one is (addVertex in flowchart/flowDb.ts).
 BLOCK = re.compile(r'@\{((?:[^"}]|"[^"]*")*)\}')
+DATA = re.compile(r'(?:[^"}]|"[^"]*")*+\}')
+# Where the lexer reads @{ as text: a string, accessibility text, and the text of an edge written
+# as -- text --> or == text ==>. A link with no text is tried first, as the lexer does, so --> isn't
+# taken for the start of edge text.
+TOKEN = re.compile(
+    r'(?P<string>")|\bacc(?:Title|Descr)\s*:[^\n]*|\baccDescr\s*\{[^}]*\}?'
+    r"|[xo<]?(?:--+[-xo>]|==+[=xo>]|-?\.+-[xo>]?)|(?P<edge>[xo<]?(?:--|==|-\.))|(?P<data>@\{)"
+)
+EDGE_END = {
+    "-": re.compile(r'(")|[xo<]?--+[-xo>]'),
+    "=": re.compile(r'(")|[xo<]?==+[=xo>]'),
+    ".": re.compile(r'(")|[xo<]?-?\.+-[xo>]?'),
+}
 # A plain key needs a space after its colon; a quoted one doesn't.
-KEY = re.compile(r"""(?:"([^"]*)"|'((?:[^'\n]|'')*)')[ \t]*:|([^\s"'#:,][^:,\n]*?)[ \t]*:(?=\s|$)""")
-DOUBLE = re.compile(r'"([^"]*)"')
-SINGLE = re.compile(r"'((?:[^'\n]|'')*)'")
+KEY = re.compile(
+    r"""(?:"((?:[^"\\\n]|\\.)*)"|'((?:[^'\n]|'')*)')[ \t]*:"""
+    r"""|([^\s"'#:,][^:,\n]*+)[ \t]*:(?=\s|$)"""
+)
+# Quoted values as YAML reads them. The lexer's own strings, which BLOCK pairs, ignore escapes.
+DOUBLE = re.compile(r'"((?:[^"\\]|\\.)*)"', re.DOTALL)
+SINGLE = re.compile(r"'((?:[^']|'')*)'")
+LEXER_STRING = re.compile(r'"[^"]*"')
 BLOCK_SCALAR = re.compile(r"([|>])([1-9]?)([+-]?)[1-9]?[ \t]*(?:#.*)?$")
 COMMENT = re.compile(r"(?:^|[ \t])#.*")
 ESCAPE = re.compile(r"\\(x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|.)", re.DOTALL)
@@ -37,11 +55,13 @@ class Entry:
 
 
 def blocks(text: str) -> Iterator[list[Entry]]:
-    """The entries of each @{…} block in text, in order."""
-    for block in BLOCK.finditer(text):
-        body, offset = block.group(1), block.start(1)
-        masked = _blank_quoted(body)
-        block = "\n" in masked
+    """The entries of each @{…} block in text, in order. text is a flowchart with what Mermaid
+    removes before parsing, such as front matter, blanked."""
+    for offset, end in _spans(text):
+        body = text[offset:end]
+        lexed = LEXER_STRING.sub(lambda m: m.group().replace("\n", " "), body)
+        block = "\n" in lexed
+        masked = _blank_quoted(lexed)
         if not block:
             # Mermaid puts one-line data between braces on lines of their own, so a comment runs to
             # the end of the data.
@@ -54,19 +74,66 @@ def blocks(text: str) -> Iterator[list[Entry]]:
         ]
 
 
+def _spans(text: str) -> Iterator[tuple[int, int]]:
+    """Where the inside of each @{…} that the lexer reads as shape data starts and ends. The scan
+    stops at anything left open: past it, Mermaid couldn't parse the diagram either."""
+    pos = 0
+    while token := TOKEN.search(text, pos):
+        pos = token.end()
+        if token.group("string"):
+            pos = text.find('"', pos) + 1
+            if not pos:
+                return
+        elif token.group("edge"):
+            pos = _edge_end(text, pos, EDGE_END[token.group("edge")[-1]])
+            if pos < 0:
+                return
+        elif token.group("data"):
+            data = DATA.match(text, pos)
+            if not data:
+                return
+            yield pos, data.end() - 1
+            pos = data.end()
+
+
+def _edge_end(text: str, pos: int, end: re.Pattern[str]) -> int:
+    """Where edge text from pos ends, past the link that ends it, or -1. A string in it is skipped."""
+    while found := end.search(text, pos):
+        if found.group(1) is None:
+            return found.end()
+        pos = text.find('"', found.end()) + 1
+        if not pos:
+            break
+    return -1
+
+
 def _blank_quoted(body: str) -> str:
-    """body with the inside of each quoted value or key blanked, line breaks included. A quote opens
-    one only where a key or value can start; inside a plain value, as in It's, it's a character."""
+    """body with the inside of each quoted value or key blanked, line breaks included."""
     out = list(body)
     i = 0
     while i < len(body):
-        quoted = (DOUBLE if body[i] == '"' else SINGLE).match(body, i) if body[i] in "\"'" else None
-        if quoted and body[:i].rstrip(" \t")[-1:] in ("", "{", ",", ":", "[", "\n"):
+        quoted = (DOUBLE if body[i] == '"' else SINGLE).match(body, i) if _opens(body, i) else None
+        if quoted:
             out[i + 1 : quoted.end() - 1] = " " * (quoted.end() - i - 2)
             i = quoted.end()
         else:
             i += 1
     return "".join(out)
+
+
+def _opens(body: str, i: int) -> bool:
+    """Whether the character at i opens a quoted key or value: a quote where one can start, or after
+    a colon that a space or a quoted key's closing quote sets apart. Inside a plain value, as in
+    It's or Era:'90s, a quote is just a character."""
+    if body[i] not in "\"'":
+        return False
+    j = i
+    while j and body[j - 1] in " \t":
+        j -= 1
+    before = body[j - 1] if j else ""
+    if before == ":":
+        return j < i or (j >= 2 and body[j - 2] in "\"'")
+    return before in ("", "{", ",", "[", "\n")
 
 
 def _flow_regions(masked: str) -> list[tuple[int, int]]:
@@ -105,18 +172,21 @@ def _entry(body: str, start: int, end: int, block: bool) -> Entry | None:
     key = KEY.match(body, start, end)
     if not key:
         return None
-    name = key.group(1) if key.group(1) is not None else key.group(3)
-    if name is None:
+    if key.group(1) is not None:
+        name = ESCAPE.sub(lambda e: _unescape(e.group(1)), key.group(1))
+    elif key.group(2) is not None:
         name = key.group(2).replace("''", "'")
+    else:
+        name = key.group(3).rstrip(" \t")
     value = _value(body, key.end(), end, block)
-    return Entry(name.strip(), *value) if value else None
+    return Entry(name, *value) if value else None
 
 
 def _value(body: str, start: int, end: int, block: bool) -> tuple[str, int, int, bool] | None:
     """A value as YAML reads it, with its span and whether it's plain. None if it's empty. In a block
-    mapping, a value can start on a later, more-indented line."""
-    if block and not COMMENT.sub("", body[start : _line_end(body, start, end)]).strip():
-        start = _line_end(body, start, end)
+    mapping, a value can start on a later, more-indented line, after blank and comment lines."""
+    while block and start < end and not COMMENT.sub("", body[start : _line_end(body, start, end)]).strip():
+        start = _line_end(body, start, end) + 1
     while start < end and body[start].isspace():
         start += 1
     if start >= end:
@@ -132,11 +202,30 @@ def _value(body: str, start: int, end: int, block: bool) -> tuple[str, int, int,
         return ESCAPE.sub(lambda e: _unescape(e.group(1)), text), start, m.end(), False
     if first.startswith("'"):
         m = SINGLE.match(body, start, end)
-        return (m.group(1).replace("''", "'"), start, m.end(), False) if m else None
+        return (_fold(m.group(1)).replace("''", "'"), start, m.end(), False) if m else None
     header = BLOCK_SCALAR.match(first) if block else None
     if header:
         return _block_scalar(body, start, line_end, end, header)
     return _plain(body, start, end)
+
+
+def _fold(text: str) -> str:
+    """A single-quoted value's lines as YAML joins them: a line break becomes a space, and each
+    blank line in between a line break, with the spaces around each break dropped."""
+    first, *rest = text.split("\n")
+    if not rest:
+        return text
+    out = first.rstrip(" \t")
+    breaks = 0
+    for n, line in enumerate(rest, 1):
+        line = line.lstrip(" \t") if n == len(rest) else line.strip(" \t")
+        if not line and n < len(rest):
+            breaks += 1
+            continue
+        out += "\n" * breaks if breaks else " "
+        out += line
+        breaks = 0
+    return out
 
 
 def _line_end(body: str, start: int, end: int) -> int:
@@ -145,19 +234,26 @@ def _line_end(body: str, start: int, end: int) -> int:
 
 
 def _plain(body: str, start: int, end: int) -> tuple[str, int, int, bool] | None:
-    """A plain value: its lines without comments, folded with single spaces."""
-    parts: list[str] = []
+    """A plain value: its lines without comments, folded as YAML folds them. A line break becomes a
+    space, and each blank line in between a line break."""
+    value = ""
+    breaks = 0
     value_end = start
     position = start
     for line in body[start:end].split("\n"):
         text = COMMENT.sub("", line)
         if text.strip():
-            parts.append(text.strip())
+            if value:
+                value += "\n" * breaks or " "
+            value += text.strip()
+            breaks = 0
             value_end = position + len(text.rstrip())
-        elif parts and line.lstrip().startswith("#"):
+        elif value and line.lstrip().startswith("#"):
             break
+        elif value:
+            breaks += 1
         position += len(line) + 1
-    return (" ".join(parts), start, value_end, True) if parts else None
+    return (value, start, value_end, True) if value else None
 
 
 def _block_scalar(

@@ -420,13 +420,16 @@ spanned lines is followed by as many, so every line keeps its number and Mermaid
 point at the file. The page gets this inlined source, and the second parse checks it.
 
 To replace a value, the inlining has to find it in the text. `shape_data.py` reads `@{…}` shape
-data following Mermaid's rules, with front matter, directives and comments blanked. The block
-ends at the first `}` outside double quotes. Its inside is YAML: a flow mapping when it's on one
-line, a block mapping when it has line breaks, where a value can run on, sit on the next line or
-be a `|` or `>` block. Only values Mermaid read as an image are replaced, so `@{…}` inside a
-label or a timeline is left alone. An image Mermaid read that the reader can't find stops the
-build, naming the node, instead of reaching the page as a broken image. The tests hold the
-reader to what Mermaid itself reads for the same shape data.
+data following the rules of Mermaid's flowchart lexer, in one pass over the diagram with front
+matter, directives and comments blanked. It skips what the lexer reads as text: strings, edge
+text such as `-- text -->`, and `accTitle` and `accDescr`. A block ends at the first `}` outside
+double quotes, and the lexer turns a line break inside those quotes into `<br/>`. The inside is
+YAML: a flow mapping on one line, or a block mapping when a line break is left, where a value
+can run on, sit on the next line or be a `|` or `>` block. Only values Mermaid read as an image
+are replaced, so shape data written as text in another diagram type is left alone too. An image
+Mermaid read that the reader can't find stops the build, naming the node, instead of reaching
+the page as a broken image. The tests hold the reader to what Mermaid itself reads for the same
+shape data.
 
 Before parsing, a diagram longer than Mermaid's `maxTextSize` stops the build: `parse()` doesn't
 enforce that limit, but drawing does. The message lists how much each inlined image uses. After
