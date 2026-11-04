@@ -187,7 +187,8 @@ def _check_links(path: Path, slide: Slide, count: int) -> None:
                 message = f"a link's URL can't continue onto the next line ('{written.replace(BREAK, '\\')}')"
                 raise _error(path, slide.line, f"slide {slide.number}: {message}")
             slide_link = SLIDE_LINK.fullmatch(url)
-            if slide_link and not 1 <= int(slide_link.group(1)) <= count:
+            # The length check keeps int() inside its digit limit; no deck has a billion slides.
+            if slide_link and (len(slide_link.group(1)) > 9 or not 1 <= int(slide_link.group(1)) <= count):
                 message = f"the link to {url} goes past the last slide, {count}"
                 raise _error(path, slide.line, f"slide {slide.number}: {message}")
             if not slide_link and not OUTSIDE_LINK.fullmatch(url):

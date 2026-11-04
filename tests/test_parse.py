@@ -447,6 +447,7 @@ def test_allowed_links_parse(line: str):
         ("[x](https://x.example/a b)", "can't link to 'https://x.example/a b'"),
         ("[x](#0)", "the link to #0 goes past the last slide, 2"),
         ("[x](#3)", "the link to #3 goes past the last slide, 2"),
+        ("[x](#1234567890)", "the link to #1234567890 goes past the last slide, 2"),
         # A code span must not hide a link from the check: the renderer still makes one.
         ("[`run`](javascript:alert%281%29)", "can't link to 'javascript:alert%281%29'"),
         ("[docs](https://x.example/`part`)", "can't link to 'https://x.example/`part`'"),
@@ -458,6 +459,14 @@ def test_bad_links_name_the_slide(text: str, message: str):
         parse(f"---\n## A\n---\nkicker: K\n\n## B\n\n- {text}\n", Path("deck.md"))
     allowed = "; a link goes to an https:, http: or mailto: address, or to a slide as #N"
     assert str(e.value) == f"deck.md:4: slide 2: {message}" + ("" if "goes past" in message else allowed)
+
+
+def test_a_slide_link_past_ints_digit_limit_goes_past_the_last_slide():
+    # 5,000 digits is past int()'s default limit, where int() raises ValueError instead of
+    # returning a number, so this fails with a traceback unless the length check comes first.
+    number = "9" * 5000
+    with pytest.raises(DeckError, match=f"the link to #{number} goes past the last slide, 1$"):
+        parse(f"---\n## A\n\n- [x](#{number})\n", Path("deck.md"))
 
 
 def test_links_are_checked_in_every_text_a_slide_shows():
