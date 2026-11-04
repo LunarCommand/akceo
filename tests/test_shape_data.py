@@ -52,7 +52,11 @@ CASES = [
     "a@{ w: 50.5, h: 20, img: x.png }",
     "a@{ img:shot.png }",
     'a@{ "img":"x.png" }',
+    # The comma shows the value after "img": is read as a string, not as plain text.
+    'a@{ "img":"a, b.png" }',
     'a@{ "img": \'y.png\', "w": 12 }',
+    # A quote after a comma opens a quoted key, so the img: in it is text.
+    'a@{ w: 4, "k, img: z.png": 1, img: y.png }',
     "a@{ img : x.png , w : 7 }",
     "a@{ img: 'a, b.png' }",
     "a@{ label: It's me, img: 'shot.png' }",
@@ -74,6 +78,8 @@ CASES = [
     'a@{\n    label: The "quick\n  start" guide\n    img: x.png\n  }',
     # Single-quoted values run over lines, and text in them isn't a key.
     "a@{\n    img: 'my\n      shot.png'\n    w: 40\n  }",
+    # Spaces on either side of the break fold into it.
+    "a@{\n    img: 'my  \n      shot.png'\n  }",
     "a@{\n    label: 'see\n    img: logo.png\n    here'\n    img: shot.png\n  }",
     "a@{\n    label: 'one\n  two'\n    img: shot.png\n  }",
     "a@{\n    img: 'one\n\n      two.png'\n  }",
@@ -110,10 +116,14 @@ def source(case: str) -> str:
 def ours(text: str) -> dict[str, object]:
     """What the reader finds for a's img, w and h, with sizes as numbers, as Mermaid gives them. A
     key found twice gives a list, which Mermaid never does for one block: it refuses a repeated key.
-    Without that, text in a label read as an img would pass whenever the real img came after it."""
-    (entries,) = shape_data.blocks(text)
+    Without that, text in a label read as an img would pass whenever the real img came after it.
+    Text read as more or fewer than one block gives the count, so that case fails by name instead
+    of the whole module failing to load."""
+    blocks = list(shape_data.blocks(text))
+    if len(blocks) != 1:
+        return {"blocks": len(blocks)}
     found: dict[str, object] = {}
-    for entry in entries:
+    for entry in blocks[0]:
         if entry.key in ("img", "w", "h"):
             value = entry.value if entry.key == "img" else float(entry.value)
             found[entry.key] = [found[entry.key], value] if entry.key in found else value

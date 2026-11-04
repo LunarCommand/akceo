@@ -46,6 +46,7 @@ def error(checker: Checker, source: str) -> str:
         # Links to a slide, data: images and URLs that are only text keep the deck self-contained.
         'flowchart LR\n  a --> b\n  click a "#5" "Go to slide 5"\n',
         'flowchart LR\n  b@{ img: "data:image/png;base64,AAAA", label: "L" }\n',
+        'flowchart LR\n  b@{ img: "DATA:image/png;base64,AAAA" }\n',
         'flowchart LR\n  a["see https://example.com"] --> b\n',
         'flowchart LR\n  a["Docs, img: https://example.com/guide"] --> b\n',
         'flowchart LR\n  b@{ label: "img: https://example.com/a.png", img: "data:image/png;base64,AA" }\n',
@@ -126,6 +127,12 @@ OUTSIDE = [
     ),
     ('flowchart LR\n  b@{ "img": "https://x.example/i.png", label: "L" }\n', 2, "https://x.example/i.png"),
     ('flowchart LR\n  b@{\n    label: "L"\n    img: "pic.png"\n  }\n', 4, "pic.png"),
+    # A quote left open in front matter doesn't hide the image's line.
+    (
+        '---\ntitle: He said "hi\n---\nflowchart LR\n  b@{ img: "https://x.example/i.png" }\n',
+        5,
+        "https://x.example/i.png",
+    ),
     # Shape data is read as Mermaid reads it: a } in a quoted label doesn't end it, and a value can
     # be unquoted or on the next line.
     ('flowchart LR\n  b@{ label: "a } b", img: "https://x.example/i.png" }\n', 2, "https://x.example/i.png"),

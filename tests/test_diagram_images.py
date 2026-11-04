@@ -157,7 +157,8 @@ def test_what_mermaid_doesnt_read_as_an_image_is_left_alone(inline: Inline, tmp_
         'flowchart LR\n  a -- see @{ img: shot.png } --> b@{ img: "shot.png" }\n',
         # Front matter and directives aren't scanned: here they'd open a string or edge text.
         '---\ntitle: The "new -- form\n---\nflowchart LR\n  b@{ img: "shot.png" }\n',
-        '%%{init: {"themeCSS": ".x { fill: var(--c) }"}}%%\nflowchart LR\n  b@{ img: "shot.png" }\n',
+        # Single quotes, so the reader doesn't take the directive's text as a string and skip it.
+        "%%{init: {'themeCSS': '.x { fill: var(--c) }'}}%%\nflowchart LR\n  b@{ img: \"shot.png\" }\n",
     ],
 )
 def test_only_the_image_mermaid_reads_is_replaced(inline: Inline, tmp_path: Path, source: str):
@@ -181,10 +182,18 @@ def test_an_image_mermaid_reads_that_akceo_cant_find_stops_the_build(
     )
 
 
-def test_a_missing_image_names_the_diagram_line(inline: Inline, tmp_path: Path):
+@pytest.mark.parametrize(
+    ("shape_data", "name"),
+    [
+        ('img: "gone.png"', "gone.png"),
+        # YAML reads 5 as a number. The check passes it on as text, as the page would use it.
+        ("img: 5", "5"),
+    ],
+)
+def test_a_missing_image_names_the_diagram_line(inline: Inline, tmp_path: Path, shape_data: str, name: str):
     with pytest.raises(DeckError) as e:
-        inline(tmp_path / "flow.mmd", node('img: "gone.png"'))
-    assert str(e.value) == f"{tmp_path / 'flow.mmd'}:3: image not found: {tmp_path / 'gone.png'}"
+        inline(tmp_path / "flow.mmd", node(shape_data))
+    assert str(e.value) == f"{tmp_path / 'flow.mmd'}:3: image not found: {tmp_path / name}"
 
 
 @pytest.mark.parametrize(
