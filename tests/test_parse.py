@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from akceo.errors import DeckError
-from akceo.parse import BREAK, Block, Deck, load, parse
+from akceo.parse import BREAK, Block, Deck, crop_box, load, parse
 
 
 def deck(text: str) -> Deck:
@@ -188,7 +188,34 @@ def test_paragraph_starting_like_a_block_marker_terminates():
         ("---\nlayout: table\ndim-last-column: true\n\n## A\n| a |\n", "must be yes or no, not 'true'"),
         (
             "---\nlayout: split\nimage: x.png\nimage-max: big\n\n## A\n",
-            "'image-max' must be a positive whole",
+            "deck.md:4: slide 1: 'image-max' must be a positive whole number of pixels, at most nine digits "
+            "0-9, not 'big'",
+        ),
+        # "²" passes str.isdigit(), and int() raises on it. Full-width digits pass both.
+        ("---\nlayout: image\nimage: x.png\nimage-max: 8\u00b2\n", "'image-max' must be a positive whole"),
+        ("---\nlayout: image\nimage: x.png\nimage-max: \uff18\uff10\n", "must be a positive whole"),
+        ("---\nlayout: image\nimage: x.png\nimage-max: 0\n", "'image-max' must be a positive whole"),
+        (
+            "---\nlayout: split\nimage: x.png\nimage-crop: 0, 0, 800\n\n## A\n",
+            "deck.md:4: slide 1: 'image-crop' must be four whole numbers of pixels, left, top, right and "
+            "bottom, each at most nine digits 0-9, such as 120, 80, 920, 580, not '0, 0, 800'",
+        ),
+        # Full-width digits pass str.isdigit(), and int() reads them, but they aren't a pixel count.
+        ("---\nlayout: image\nimage: x.png\nimage-crop: 0, 0, \uff18\uff10, 60\n", "must be four whole"),
+        ("---\nlayout: image\nimage: x.png\nimage-crop: 0, 0, -8, 60\n", "must be four whole"),
+        (
+            "---\nlayout: image\nimage: x.png\nimage-crop: 80, 0, 80, 60\n",
+            "'image-crop' 80, 0, 80, 60 is empty: right must be past left, and bottom below top",
+        ),
+        ("---\nlayout: image\nimage: x.png\nimage-crop: 0, 60, 80, 50\n", "is empty"),
+        (
+            "---\nlayout: image\nimage: chart.SVG\nimage-crop: 0, 0, 80, 60\n",
+            "'image-crop' only works on PNG, JPEG and WebP images, not chart.SVG",
+        ),
+        ("---\nlayout: image\nimage: flow.mmd\nimage-crop: 0, 0, 80, 60\n", "not flow.mmd"),
+        (
+            "---\nimage-crop: 0, 0, 80, 60\n\n## A\n",
+            "'image-crop' only applies to the split and image layouts",
         ),
         (
             "---\nkicker: K\nstyle-h2: background:URL (https://x.test/a.png)\n\n## A\n",
@@ -301,6 +328,44 @@ def test_image_layout_takes_image_keys_and_needs_no_content():
     assert deck("---\nlayout: image\n").slides[0].meta == {"layout": "image"}
 
 
+@pytest.mark.parametrize("digits", [10, 5000])
+@pytest.mark.parametrize(
+    ("header", "message"),
+    [
+        ("image-max: {}", "'image-max' must be a positive whole"),
+        ("image-crop: 0, 0, {}, 10", "'image-crop' must be four whole"),
+    ],
+)
+def test_pixel_counts_take_at_most_nine_digits(header: str, message: str, digits: int):
+    # 5,000 digits is past int()'s default limit, where int() raises ValueError instead of
+    # returning a number, so this case fails with a traceback unless the pattern refuses it first.
+    with pytest.raises(DeckError, match=message):
+        deck(f"---\nlayout: image\nimage: x.png\n{header.format('9' * digits)}\n")
+    deck(f"---\nlayout: image\nimage: x.png\n{header.format('9' * 9)}\n")
+
+
+@pytest.mark.parametrize("value", ["120, 80, 920, 580", "120 80 920 580", "120,80 , 920   580"])
+def test_image_crop_takes_commas_or_spaces(value: str):
+    d = deck(f"---\nlayout: image\nimage: x.png\nimage-crop: {value}\n")
+    assert crop_box(d.slides[0].meta["image-crop"], "image-crop") == (120, 80, 920, 580)
+
+
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        ("0, 0, 80", "'crop' must be four whole numbers of pixels"),
+        ("0, 0, 1234567890, 60", "'crop' must be four whole numbers of pixels"),
+        ("80, 0, 80, 60", "'crop' 80, 0, 80, 60 is empty"),
+        ("0, 60, 80, 50", "'crop' 0, 60, 80, 50 is empty"),
+    ],
+)
+def test_crop_box_refuses_what_the_slide_check_refuses(value: str, message: str):
+    # Diagram images take their crop from a path option and never pass through the slide check, so
+    # crop_box itself must refuse a bad crop rather than hand back nothing to crop.
+    with pytest.raises(DeckError, match=f"^{message}"):
+        crop_box(value, "crop")
+
+
 def test_image_layout_takes_a_heading_and_a_caption():
     d = deck("---\nlayout: image\nimage: x.png\n\n## Results\n\nThroughput after the fix,\nper region.\n")
     assert d.slides[0].blocks == (
@@ -363,6 +428,7 @@ def test_image_frame_errors(source: str, message: str):
         "- [docs](http://x.example)",
         "- [write](mailto:a@b.example)",
         "- [back](#1), [next](#2)",
+        "- [back](#0000000001)",
         "- `[not a link](javascript:x)`",
         "- [brackets] and (parentheses) on their own",
     ],
@@ -382,6 +448,8 @@ def test_allowed_links_parse(line: str):
         ("[x](https://x.example/a b)", "can't link to 'https://x.example/a b'"),
         ("[x](#0)", "the link to #0 goes past the last slide, 2"),
         ("[x](#3)", "the link to #3 goes past the last slide, 2"),
+        ("[x](#1234567890)", "the link to #1234567890 goes past the last slide, 2"),
+        ("[x](#0000000003)", "the link to #0000000003 goes past the last slide, 2"),
         # A code span must not hide a link from the check: the renderer still makes one.
         ("[`run`](javascript:alert%281%29)", "can't link to 'javascript:alert%281%29'"),
         ("[docs](https://x.example/`part`)", "can't link to 'https://x.example/`part`'"),
@@ -393,6 +461,20 @@ def test_bad_links_name_the_slide(text: str, message: str):
         parse(f"---\n## A\n---\nkicker: K\n\n## B\n\n- {text}\n", Path("deck.md"))
     allowed = "; a link goes to an https:, http: or mailto: address, or to a slide as #N"
     assert str(e.value) == f"deck.md:4: slide 2: {message}" + ("" if "goes past" in message else allowed)
+
+
+def test_a_slide_link_past_ints_digit_limit_goes_past_the_last_slide():
+    # 5,000 digits is past int()'s default limit, where int() raises ValueError instead of
+    # returning a number, so this fails with a traceback unless the length check comes first.
+    number = "9" * 5000
+    with pytest.raises(DeckError, match=f"the link to #{number} goes past the last slide, 1$"):
+        parse(f"---\n## A\n\n- [x](#{number})\n", Path("deck.md"))
+
+
+def test_leading_zeros_dont_count_toward_a_slide_links_length():
+    # deck.js reads the hash with parseInt, so this opens slide 1. Checking the length before
+    # stripping the zeros would call it past the last slide.
+    deck(f"---\n## A\n\n- [x](#{'0' * 5000}1)\n")
 
 
 def test_links_are_checked_in_every_text_a_slide_shows():

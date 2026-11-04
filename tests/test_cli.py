@@ -1,4 +1,5 @@
 import base64
+import io
 import re
 import shutil
 import zlib
@@ -104,6 +105,27 @@ def test_image_frame_setting_reaches_the_page(tmp_path: Path):
     assert page.count(CSP) == 1
 
 
+def test_image_crop_reaches_the_page(tmp_path: Path):
+    Image.new("RGB", (400, 200)).save(tmp_path / "fig.png")
+    (tmp_path / "deck.md").write_text("---\nlayout: image\nimage: fig.png\nimage-crop: 100, 50, 300, 150\n")
+    page, _ = render.build(tmp_path / "deck.md")
+    src = re.search(r'<img src="data:image/png;base64,([^"]+)"', page)
+    assert src
+    with Image.open(io.BytesIO(base64.b64decode(src[1]))) as im:
+        assert im.size == (200, 100)
+
+
+def test_crop_errors_name_the_slide(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    Image.new("RGB", (400, 200)).save(tmp_path / "fig.png")
+    deck = tmp_path / "deck.md"
+    deck.write_text("---\n## One\n---\nlayout: image\nimage: fig.png\nimage-crop: 0, 0, 500, 100\n")
+    assert main(["build", str(deck)]) == 1
+    assert capsys.readouterr().err == (
+        f"akceo: {deck}:4: slide 2: the crop 0, 0, 500, 100 goes past the edge of {tmp_path / 'fig.png'}, "
+        "which is 400 by 200 pixels\n"
+    )
+
+
 def test_diagram_frames_pick_the_colors(tmp_path: Path):
     (tmp_path / "flow.mmd").write_text("flowchart LR\n  a --> b\n")
     (tmp_path / "deck.md").write_text(
@@ -191,6 +213,17 @@ def test_missing_diagram(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     deck.write_text("---\nlayout: image\nimage: gone.mmd\n")
     assert main(["build", str(deck)]) == 1
     assert f"{deck}:2: slide 1: image not found: {tmp_path / 'gone.mmd'}" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("suffix", ["png", "mmd"])
+def test_a_name_too_long_for_the_system_is_not_found(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], suffix: str
+):
+    name = "a" * 300 + "." + suffix
+    deck = tmp_path / "deck.md"
+    deck.write_text(f"---\nlayout: image\nimage: {name}\n")
+    assert main(["build", str(deck)]) == 1
+    assert f"{deck}:2: slide 1: image not found: {tmp_path / name}" in capsys.readouterr().err
 
 
 def test_check_reports_without_writing(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
