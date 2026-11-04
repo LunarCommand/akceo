@@ -10,7 +10,6 @@ from dataclasses import dataclass
 # as a flow mapping when there's no line break outside the quotes, and as a block mapping when there
 # is (addVertex in src/diagrams/flowchart/flowDb.ts).
 BLOCK = re.compile(r'@\{((?:[^"}]|"[^"]*")*)\}')
-QUOTED = re.compile(r""""[^"]*"|'(?:[^'\n]|'')*'""")
 # A plain key needs a space after its colon; a quoted one doesn't.
 KEY = re.compile(r"""(?:"([^"]*)"|'((?:[^'\n]|'')*)')[ \t]*:|([^\s"'#:,][^:,\n]*?)[ \t]*:(?=\s|$)""")
 DOUBLE = re.compile(r'"([^"]*)"')
@@ -20,8 +19,8 @@ COMMENT = re.compile(r"(?:^|[ \t])#.*")
 ESCAPE = re.compile(r"\\(x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|.)", re.DOTALL)
 ESCAPES = {
     "0": "\0", "a": "\a", "b": "\b", "t": "\t", "\t": "\t", "n": "\n", "v": "\v", "f": "\f", "r": "\r",
-    "e": "\x1b", " ": " ", '"': '"', "/": "/", "\\": "\\", "N": "\x85", "_": "\xa0", "L": " ",
-    "P": " ",
+    "e": "\x1b", " ": " ", '"': '"', "/": "/", "\\": "\\", "N": "\x85", "_": "\xa0", "L": "\u2028",
+    "P": "\u2029",
 }  # fmt: skip
 
 
@@ -41,13 +40,33 @@ def blocks(text: str) -> Iterator[list[Entry]]:
     """The entries of each @{…} block in text, in order."""
     for block in BLOCK.finditer(text):
         body, offset = block.group(1), block.start(1)
-        masked = QUOTED.sub(lambda m: m.group()[0] + " " * (len(m.group()) - 2) + m.group()[-1], body)
-        regions = _block_regions(masked) if "\n" in masked else _flow_regions(masked)
+        masked = _blank_quoted(body)
+        block = "\n" in masked
+        if not block:
+            # Mermaid puts one-line data between braces on lines of their own, so a comment runs to
+            # the end of the data.
+            masked = COMMENT.sub(lambda m: " " * len(m.group()), masked)
+        regions = _block_regions(masked) if block else _flow_regions(masked)
         yield [
             Entry(e.key, e.value, e.start + offset, e.end + offset, e.plain)
             for start, end in regions
-            if (e := _entry(body, start, end, "\n" in masked))
+            if (e := _entry(body, start, end, block))
         ]
+
+
+def _blank_quoted(body: str) -> str:
+    """body with the inside of each quoted value or key blanked, line breaks included. A quote opens
+    one only where a key or value can start; inside a plain value, as in It's, it's a character."""
+    out = list(body)
+    i = 0
+    while i < len(body):
+        quoted = (DOUBLE if body[i] == '"' else SINGLE).match(body, i) if body[i] in "\"'" else None
+        if quoted and body[:i].rstrip(" \t")[-1:] in ("", "{", ",", ":", "[", "\n"):
+            out[i + 1 : quoted.end() - 1] = " " * (quoted.end() - i - 2)
+            i = quoted.end()
+        else:
+            i += 1
+    return "".join(out)
 
 
 def _flow_regions(masked: str) -> list[tuple[int, int]]:
@@ -145,8 +164,15 @@ def _block_scalar(
     body: str, start: int, line_end: int, end: int, header: re.Match[str]
 ) -> tuple[str, int, int, bool] | None:
     """A | or > block scalar: the lines under its header, with their common indent removed, joined
-    by line breaks for | or spaces for >, and the final line break kept, dropped (-) or all kept (+)."""
-    lines = body[line_end + 1 : end].split("\n") if line_end < end else []
+    by line breaks for | or spaces for >, and the final line break kept, dropped (-) or all kept (+).
+    Its lines are those indented more than its key; the first that isn't, even a comment, ends it."""
+    key_line = body.rfind("\n", 0, start) + 1
+    key_indent = _indent(body, key_line, start)
+    lines: list[str] = []
+    for line in body[line_end + 1 : end].split("\n") if line_end < end else []:
+        if line.strip() and len(line) - len(line.lstrip(" \t")) <= key_indent:
+            break
+        lines.append(line)
     while lines and not lines[-1].strip():
         lines.pop()
     if not lines:
@@ -161,6 +187,9 @@ def _block_scalar(
 
 
 def _unescape(code: str) -> str:
+    """The character an escape stands for. One that isn't a valid character, such as \\U00110000 or
+    a lone surrogate, is left as written for Mermaid to judge."""
     if code[0] in "xuU" and len(code) > 1:
-        return chr(int(code[1:], 16))
+        point = int(code[1:], 16)
+        return chr(point) if point < 0x110000 and not 0xD800 <= point <= 0xDFFF else "\\" + code
     return ESCAPES.get(code, "\\" + code)

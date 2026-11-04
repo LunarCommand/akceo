@@ -46,6 +46,7 @@ CASES = [
     "a@{ img: shot.png #note\n }",
     'a@{ img: "C:\\\\shots\\\\x.png" }',
     'a@{ img: "caf\\u00e9.png" }',
+    'a@{ label: "\\U00110000 \\ud800", img: x.png }',
     'a@{ w: "60", img: x.png }',
     "a@{ w: 50.5, h: 20, img: x.png }",
     "a@{ img:shot.png }",
@@ -53,10 +54,15 @@ CASES = [
     'a@{ "img": \'y.png\', "w": 12 }',
     "a@{ img : x.png , w : 7 }",
     "a@{ img: 'a, b.png' }",
+    "a@{ label: It's me, img: 'shot.png' }",
+    "a@{ label: L # example, img: missing.png }",
+    "a@{ img: x.png # w: 10 }",
     "a@{\n    img: my shot.png#crop=1,2,3,4\n    w: 40\n  }",
     "a@{\n    img: >-\n      folded.png\n    h: 30\n  }",
     "a@{\n    img: >\n      folded.png\n  }",
     "a@{\n    img: |\n      lit.png\n  }",
+    "a@{\n    img: >-\n      shot.png\n    # explain the image\n    w: 30\n  }",
+    "a@{\n    img: |\n      shot.png\n      # part of the value\n  }",
     'a@{\n    img:\n      "next.png"\n  }',
     "a@{\n    img: my\n      shot.png\n  }",
     "a@{\n    # a comment\n    img: x.png # note\n    label: >\n      img: no.png\n  }",
@@ -123,6 +129,12 @@ def test_a_replaced_value_reads_back_with_every_line_in_place(
     new = replaced(text)
     assert mermaid[new] == {**mermaid[text], "img": json.loads(REPLACEMENT)}
     assert new.count("\n") == text.count("\n")
+
+
+def test_an_escape_that_isnt_a_character_is_left_as_written():
+    text = 'flowchart LR\n  a@{ label: "\\U00110000 \\ud800" }\n'
+    (entries,) = shape_data.blocks(text)
+    assert [(e.key, e.value) for e in entries] == [("label", "\\U00110000 \\ud800")]
 
 
 def test_values_keep_their_place_in_the_source():

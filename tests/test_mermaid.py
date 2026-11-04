@@ -127,6 +127,8 @@ OUTSIDE = [
     # be unquoted or on the next line.
     ('flowchart LR\n  b@{ label: "a } b", img: "https://x.example/i.png" }\n', 2, "https://x.example/i.png"),
     ("flowchart LR\n  b@{\n    img:\n      https://x.example/p.png\n  }\n", 4, "https://x.example/p.png"),
+    # An apostrophe inside a plain label doesn't open a quote.
+    ("flowchart LR\n  b@{ label: It's me, img: 'https://x.example/q.png' }\n", 2, "https://x.example/q.png"),
     # HTML in a label: src with a padded value, srcset, and a tag split over two lines.
     ("flowchart LR\n  a --> c[\"<img src=' https://x.example/l.png'/> L\"]\n", 2, "https://x.example/l.png"),
     ("flowchart LR\n  a --> c[\"<img srcset='https://x.example/s.png'> L\"]\n", 2, "https://x.example/s.png"),
