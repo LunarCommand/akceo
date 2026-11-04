@@ -53,8 +53,8 @@ A slide starts with `key: value` header lines. Then comes a blank line, then the
 | `meta` | title | A line of text under the title. |
 | `image` | split, image | Image file, relative to the `images` folder. Leave it out to show a dashed placeholder while the image doesn't exist yet. |
 | `image-alt` | split, image | Alt text for the image. |
-| `image-max` | split, image | Longest side in pixels after shrinking. Default `2400`. |
-| `image-crop` | split, image | Keep only part of the image: `left, top, right, bottom` in pixels, such as `120, 80, 920, 580`. Commas or spaces separate the numbers. See [Images](#images). |
+| `image-max` | split, image | Longest side in pixels after shrinking: a whole number of at most nine digits 0-9. Default `2400`. |
+| `image-crop` | split, image | Keep only part of the image: `left, top, right, bottom` in pixels, such as `120, 80, 920, 580`, each a whole number of at most nine digits 0-9. Commas or spaces separate the numbers. See [Images](#images). |
 | `image-wide` | split | `yes` gives the image the wider column. |
 | `image-frame` | split, image | `yes` or `no` for this slide's image, overriding the deck's `image-frame`. |
 | `dim-last-column` | table | `yes` shows the last column in muted text. |
@@ -151,10 +151,14 @@ The `split` and `image` layouts embed their image in the page.
 
 Other formats stop the build.
 
-`image-crop` gives the two corners of the part to keep, counted in pixels from the top-left of
-the image as it appears, upright. `image-crop: 120, 80, 920, 580` keeps an 800 by 500 area. A
-crop that goes past the image's edge stops the build and gives the image's size. SVG and Mermaid
-diagrams can't be cropped.
+`image-crop` gives the part of the image to keep, in pixels counted from the top-left corner of
+the image as it appears, upright. `left` and `top` are the first column and row kept; `right` and
+`bottom` are the edges just past the last ones. So `image-crop: 120, 80, 920, 580` keeps an 800
+by 500 area, and `0, 0, W, H` keeps all of a W by H image. A photo stored sideways with an EXIF
+orientation counts in its upright size, which may not be the size other tools report.
+
+A crop that goes past the image's edge stops the build and gives the image's size, and its
+stored size too when EXIF turned it. A crop on an SVG or a Mermaid diagram also stops the build.
 
 ### Mermaid diagrams
 

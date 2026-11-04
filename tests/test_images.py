@@ -119,6 +119,15 @@ def test_crop_past_the_edge_gives_the_image_size(tmp_path: Path):
     assert str(e.value) == f"the crop 0, 0, 400, 201 goes past the edge of {path}, which is 400 by 200 pixels"
 
 
+def test_crop_past_the_edge_of_a_rotated_image_gives_both_sizes(tmp_path: Path):
+    exif = Image.Exif()
+    exif[0x0112] = 6
+    Image.new("RGB", (300, 100)).save(tmp_path / "a.jpg", format="JPEG", exif=exif)
+    with pytest.raises(DeckError) as e:
+        data_uri(tmp_path / "a.jpg", 1000, (0, 0, 100, 301))
+    assert str(e.value).endswith("which is 100 by 300 pixels once turned upright (stored as 300 by 100)")
+
+
 def test_svg_cant_be_cropped(tmp_path: Path):
     (tmp_path / "a.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg"/>')
     with pytest.raises(DeckError, match="can't crop an SVG image: .*a.svg"):

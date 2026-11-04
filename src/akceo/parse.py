@@ -259,9 +259,16 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
         if key in FLAG_KEYS and value not in ("yes", "no"):
             raise fail(f"'{key}' must be yes or no, not '{value}'", line)
         if key == "image-max" and not (PIXELS.fullmatch(value) and int(value) > 0):
-            raise fail(f"'image-max' must be a positive whole number of pixels, not '{value}'", line)
-        if key == "image-crop" and (problem := _crop_problem(meta.get("image", ""), value)):
-            raise fail(problem, line)
+            rule = "a positive whole number of pixels, at most nine digits 0-9"
+            raise fail(f"'image-max' must be {rule}, not '{value}'", line)
+        if key == "image-crop":
+            try:
+                crop_box(value, key)
+            except DeckError as e:
+                raise fail(str(e), line) from None
+            image = meta.get("image", "")
+            if image.lower().endswith((".svg", ".mmd")):
+                raise fail(f"'image-crop' only works on PNG, JPEG and WebP images, not {image}", line)
         if key in STYLE_KEYS and STYLE_URL.search(value):
             raise fail(f"'{key}' can't reference files or URLs (url() or image-set())", line)
 
@@ -283,28 +290,19 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
     return Slide(number, first, meta, tuple(blocks))
 
 
-def crop_box(value: str) -> tuple[int, int, int, int] | None:
-    """An image-crop value as (left, top, right, bottom), or None if it isn't four whole numbers."""
+def crop_box(value: str, key: str) -> tuple[int, int, int, int]:
+    """A crop value as (left, top, right, bottom). A value that isn't four whole numbers, or that
+    keeps nothing, raises a DeckError naming key, the setting it came from."""
     m = CROP.fullmatch(value.strip())
     if not m:
-        return None
-    left, top, right, bottom = map(int, m.groups())
-    return left, top, right, bottom
-
-
-def _crop_problem(image: str, value: str) -> str | None:
-    box = crop_box(value)
-    if box is None:
-        return (
-            "'image-crop' must be four whole numbers of pixels, left, top, right and bottom, such as "
-            f"120, 80, 920, 580, not '{value}'"
+        raise DeckError(
+            f"'{key}' must be four whole numbers of pixels, left, top, right and bottom, each at most nine "
+            f"digits 0-9, such as 120, 80, 920, 580, not '{value}'"
         )
-    left, top, right, bottom = box
+    left, top, right, bottom = map(int, m.groups())
     if right <= left or bottom <= top:
-        return f"'image-crop' {value} is empty: right must be past left, and bottom below top"
-    if image.lower().endswith((".svg", ".mmd")):
-        return f"'image-crop' only works on PNG, JPEG and WebP images, not {image}"
-    return None
+        raise DeckError(f"'{key}' {value} is empty: right must be past left, and bottom below top")
+    return left, top, right, bottom
 
 
 def _join(names: list[str]) -> str:

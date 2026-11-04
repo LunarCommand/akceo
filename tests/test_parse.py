@@ -188,7 +188,8 @@ def test_paragraph_starting_like_a_block_marker_terminates():
         ("---\nlayout: table\ndim-last-column: true\n\n## A\n| a |\n", "must be yes or no, not 'true'"),
         (
             "---\nlayout: split\nimage: x.png\nimage-max: big\n\n## A\n",
-            "'image-max' must be a positive whole",
+            "deck.md:4: slide 1: 'image-max' must be a positive whole number of pixels, at most nine digits "
+            "0-9, not 'big'",
         ),
         # "²" passes str.isdigit(), and int() raises on it. Full-width digits pass both.
         ("---\nlayout: image\nimage: x.png\nimage-max: 8\u00b2\n", "'image-max' must be a positive whole"),
@@ -197,7 +198,7 @@ def test_paragraph_starting_like_a_block_marker_terminates():
         (
             "---\nlayout: split\nimage: x.png\nimage-crop: 0, 0, 800\n\n## A\n",
             "deck.md:4: slide 1: 'image-crop' must be four whole numbers of pixels, left, top, right and "
-            "bottom, such as 120, 80, 920, 580, not '0, 0, 800'",
+            "bottom, each at most nine digits 0-9, such as 120, 80, 920, 580, not '0, 0, 800'",
         ),
         # Full-width digits pass str.isdigit(), and int() reads them, but they aren't a pixel count.
         ("---\nlayout: image\nimage: x.png\nimage-crop: 0, 0, \uff18\uff10, 60\n", "must be four whole"),
@@ -346,7 +347,23 @@ def test_pixel_counts_take_at_most_nine_digits(header: str, message: str, digits
 @pytest.mark.parametrize("value", ["120, 80, 920, 580", "120 80 920 580", "120,80 , 920   580"])
 def test_image_crop_takes_commas_or_spaces(value: str):
     d = deck(f"---\nlayout: image\nimage: x.png\nimage-crop: {value}\n")
-    assert crop_box(d.slides[0].meta["image-crop"]) == (120, 80, 920, 580)
+    assert crop_box(d.slides[0].meta["image-crop"], "image-crop") == (120, 80, 920, 580)
+
+
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        ("0, 0, 80", "'crop' must be four whole numbers of pixels"),
+        ("0, 0, 1234567890, 60", "'crop' must be four whole numbers of pixels"),
+        ("80, 0, 80, 60", "'crop' 80, 0, 80, 60 is empty"),
+        ("0, 60, 80, 50", "'crop' 0, 60, 80, 50 is empty"),
+    ],
+)
+def test_crop_box_refuses_what_the_slide_check_refuses(value: str, message: str):
+    # Diagram images take their crop from a path option and never pass through the slide check, so
+    # crop_box itself must refuse a bad crop rather than hand back nothing to crop.
+    with pytest.raises(DeckError, match=f"^{message}"):
+        crop_box(value, "crop")
 
 
 def test_image_layout_takes_a_heading_and_a_caption():

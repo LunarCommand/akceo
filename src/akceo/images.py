@@ -32,7 +32,7 @@ def data_uri(path: Path, max_px: int, crop: tuple[int, int, int, int] | None = N
                 )
             image = ImageOps.exif_transpose(opened)
             if crop:
-                image = _crop(image, crop, path)
+                image = _crop(image, crop, path, opened.size)
             image.thumbnail((max_px, max_px))
             buf = io.BytesIO()
             image.save(buf, format=fmt, **SAVE_OPTIONS[fmt])
@@ -43,13 +43,17 @@ def data_uri(path: Path, max_px: int, crop: tuple[int, int, int, int] | None = N
     return _uri(MIME[fmt], buf.getvalue())
 
 
-def _crop(image: Image.Image, box: tuple[int, int, int, int], path: Path) -> Image.Image:
+def _crop(
+    image: Image.Image, box: tuple[int, int, int, int], path: Path, stored: tuple[int, int]
+) -> Image.Image:
+    """Crop the upright image. stored is the size before EXIF turned it upright, which is what most
+    tools report, so the edge error gives both when they differ."""
     width, height = image.size
     if box[2] > width or box[3] > height:
-        raise DeckError(
-            f"the crop {', '.join(map(str, box))} goes past the edge of {path}, which is {width} by "
-            f"{height} pixels"
-        )
+        size = f"{width} by {height} pixels"
+        if (width, height) != stored:
+            size += f" once turned upright (stored as {stored[0]} by {stored[1]})"
+        raise DeckError(f"the crop {', '.join(map(str, box))} goes past the edge of {path}, which is {size}")
     return image.crop(box)
 
 

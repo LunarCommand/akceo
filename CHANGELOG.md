@@ -18,6 +18,11 @@ All notable changes to this project are documented here. The format follows
   PNG, JPEG or WebP image, in pixels, before it's shrunk to `image-max`. A crop past the image's
   edge stops the build and gives the image's size.
 
+### Changed
+
+- `image-max` takes a whole number of at most nine digits 0-9. Other digits, such as full-width
+  ones, and longer numbers used to be accepted and now stop the build.
+
 ### Fixed
 
 - A control character in a deck, such as a stray NUL, stops the build with its line. It
