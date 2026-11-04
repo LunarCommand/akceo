@@ -149,7 +149,8 @@ The `split` and `image` layouts embed their image in the page.
 - **Mermaid** diagrams in a `.mmd` file are drawn as SVG by the page when it opens. akceo
   includes Mermaid, so nothing else needs installing. See [Mermaid diagrams](#mermaid-diagrams).
 
-Other formats stop the build.
+Other formats stop the build, and so does an image akceo can't process, such as one with
+damaged EXIF data.
 
 `image-crop` gives the part of the image to keep, in pixels counted from the top-left corner of
 the image as it appears, upright. `left` and `top` are the first column and row kept; `right` and

@@ -1,6 +1,13 @@
+import os
 from pathlib import Path
 
 from akceo.errors import DeckError
+
+
+def is_file(path: Path) -> bool:
+    """Whether path is a file. Unlike Path.is_file(), this is False for a name the system refuses,
+    such as one too long, rather than an OSError."""
+    return os.path.isfile(path)
 
 
 def read_text(path: Path, what: str) -> str:

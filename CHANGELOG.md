@@ -31,6 +31,11 @@ All notable changes to this project are documented here. The format follows
   a Python traceback.
 - An `image-max` with a digit outside ASCII, such as `8²`, or with thousands of digits, stops
   the build with a message. It used to crash with a Python traceback.
+- An image that Pillow can't process stops the build with a message naming it, such as a PNG or
+  WebP with damaged EXIF data, a 16-bit grayscale PNG shrunk four times or more, or a file that
+  declares a huge size. These used to crash with a Python traceback.
+- An image or diagram whose file name is too long for the system is reported as not found. It
+  used to crash with a Python traceback.
 
 ## [0.2.1] - 2026-10-30
 

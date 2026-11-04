@@ -7,6 +7,7 @@ from typing import Any
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
+from akceo import files
 from akceo.errors import DeckError
 
 MIME = {"PNG": "image/png", "JPEG": "image/jpeg", "WEBP": "image/webp"}
@@ -17,7 +18,7 @@ def data_uri(path: Path, max_px: int, crop: tuple[int, int, int, int] | None = N
     """Embed an image. Raster formats are turned upright, cropped to crop (left, top, right, bottom)
     if given, then shrunk so the longest side is at most max_px. SVG is embedded as-is. Mermaid .mmd
     diagrams don't come here; the page draws them (see akceo.mermaid)."""
-    if not path.is_file():
+    if not files.is_file(path):
         raise DeckError(f"image not found: {path}")
     try:
         if path.suffix.lower() == ".svg":
@@ -40,6 +41,10 @@ def data_uri(path: Path, max_px: int, crop: tuple[int, int, int, int] | None = N
         raise DeckError(f"not a readable image: {path}") from None
     except OSError as e:
         raise DeckError(f"can't read image {path}: {e.strerror or e}") from None
+    # Pillow reports some damaged or unsupported images with these rather than OSError: EXIF that
+    # isn't TIFF (SyntaxError), a mode thumbnail() can't reduce (ValueError), a huge declared size.
+    except (ValueError, SyntaxError, Image.DecompressionBombError) as e:
+        raise DeckError(f"can't process image {path}: {e}") from None
     return _uri(MIME[fmt], buf.getvalue())
 
 

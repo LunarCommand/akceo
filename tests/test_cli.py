@@ -215,6 +215,17 @@ def test_missing_diagram(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     assert f"{deck}:2: slide 1: image not found: {tmp_path / 'gone.mmd'}" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize("suffix", ["png", "mmd"])
+def test_a_name_too_long_for_the_system_is_not_found(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], suffix: str
+):
+    name = "a" * 300 + "." + suffix
+    deck = tmp_path / "deck.md"
+    deck.write_text(f"---\nlayout: image\nimage: {name}\n")
+    assert main(["build", str(deck)]) == 1
+    assert f"{deck}:2: slide 1: image not found: {tmp_path / name}" in capsys.readouterr().err
+
+
 def test_check_reports_without_writing(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     shutil.copytree(DEMO, tmp_path / "demo", ignore=shutil.ignore_patterns("*.html"))
     deck = tmp_path / "demo" / "deck.md"

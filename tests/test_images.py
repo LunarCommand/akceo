@@ -132,3 +132,32 @@ def test_svg_cant_be_cropped(tmp_path: Path):
     (tmp_path / "a.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg"/>')
     with pytest.raises(DeckError, match="can't crop an SVG image: .*a.svg"):
         data_uri(tmp_path / "a.svg", 100, (0, 0, 10, 10))
+
+
+def test_a_name_too_long_for_the_system_is_not_found(tmp_path: Path):
+    with pytest.raises(DeckError, match="image not found"):
+        data_uri(tmp_path / ("a" * 300 + ".png"), 100)
+
+
+def test_a_16_bit_image_pillow_cant_shrink_stops_with_a_message(tmp_path: Path):
+    # thumbnail() reduces by four times or more with Image.reduce(), which refuses mode I;16.
+    Image.new("I;16", (1000, 600), 3000).save(tmp_path / "a.png")
+    with pytest.raises(DeckError, match="can't process image .*a.png: image has wrong mode"):
+        data_uri(tmp_path / "a.png", 200)
+
+
+@pytest.mark.parametrize("suffix", ["png", "webp"])
+def test_exif_that_isnt_tiff_stops_with_a_message(tmp_path: Path, suffix: str):
+    Image.new("RGB", (50, 50)).save(tmp_path / f"a.{suffix}", exif=b"Exif\x00\x00not a tiff header")
+    with pytest.raises(DeckError, match=f"can't process image .*a.{suffix}: not a TIFF file"):
+        data_uri(tmp_path / f"a.{suffix}", 100)
+
+
+def test_an_image_too_large_to_open_safely_stops_with_a_message(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    # Pillow refuses an image over twice MAX_IMAGE_PIXELS. Lowering the limit keeps the file small.
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 1000)
+    save(tmp_path / "a.png", (100, 100), "PNG")
+    with pytest.raises(DeckError, match="can't process image .*a.png: Image size .* exceeds limit"):
+        data_uri(tmp_path / "a.png", 100)

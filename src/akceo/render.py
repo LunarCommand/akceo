@@ -84,7 +84,7 @@ def _diagram(deck: Deck, slide: Slide, images_dir: Path, checker: mermaid.Checke
         return ""
     path = images_dir / slide.meta["image"]
     try:
-        if not path.is_file():
+        if not files.is_file(path):
             raise DeckError(f"image not found: {path}")
         source = files.read_text(path, "diagram")
         checker.check(path, source)

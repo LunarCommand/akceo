@@ -222,7 +222,7 @@ flowchart TD
 | `themes.py` | Finds a theme by name or path, checks that it sets every token, and reads the token values that Mermaid diagrams use |
 | `images.py` | Turns an image file into a `data:` URI, cropping and shrinking raster images |
 | `mermaid.py` | Checks each `.mmd` diagram with Mermaid's parser in V8, builds the theme's Mermaid config, and packs the vendored script for the page, with its license notices |
-| `files.py` | Reads user files, turning read and decode failures into `DeckError` |
+| `files.py` | Checks for and reads user files, turning read and decode failures into `DeckError` |
 | `errors.py` | `DeckError`, the one exception type the CLI reports to the user |
 
 ### The build pipeline
@@ -369,6 +369,9 @@ flowchart TD
     raw --> uri["base64 data: URI in the img src"]
     save --> uri
 ```
+
+A step Pillow can't complete, such as reading damaged EXIF data, stops the build with "can't
+process image" and Pillow's reason.
 
 Images are processed on every build, so replacing an image file and rebuilding just works.
 

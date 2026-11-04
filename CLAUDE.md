@@ -13,7 +13,8 @@ dependencies are Pillow (images) and mini-racer (V8, to check Mermaid diagrams a
   `python -m akceo.mermaid`), the theme's Mermaid config, and the vendored Mermaid script, packed
   for the page, with its license notices.
 - `src/akceo/themes.py`: theme lookup and the token check.
-- `src/akceo/files.py`: reads user-supplied text files, turning read failures into `DeckError`.
+- `src/akceo/files.py`: checks for and reads user-supplied files, turning read failures into
+  `DeckError`.
 - `src/akceo/cli.py`: the `akceo` command.
 - `src/akceo/assets/`: the page template, `base.css` (layout rules; all colors and fonts come from
   theme tokens), `deck.js` (navigation), `diagrams.js` (unpacks Mermaid and draws the diagrams),
