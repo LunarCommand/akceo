@@ -53,7 +53,8 @@ A slide starts with `key: value` header lines. Then comes a blank line, then the
 | `meta` | title | A line of text under the title. |
 | `image` | split, image | Image file, relative to the `images` folder. Leave it out to show a dashed placeholder while the image doesn't exist yet. |
 | `image-alt` | split, image | Alt text for the image. |
-| `image-max` | split, image | Longest side in pixels after shrinking. Default `2400`. |
+| `image-max` | split, image | Longest side in pixels after shrinking: a whole number of at most nine digits 0-9. Default `2400`. |
+| `image-crop` | split, image | Keep only part of the image: `left, top, right, bottom` in pixels, such as `120, 80, 920, 580`, each a whole number of at most nine digits 0-9. Commas or spaces separate the numbers. See [Images](#images). |
 | `image-wide` | split | `yes` gives the image the wider column. |
 | `image-frame` | split, image | `yes` or `no` for this slide's image, overriding the deck's `image-frame`. |
 | `dim-last-column` | table | `yes` shows the last column in muted text. |
@@ -141,14 +142,24 @@ Clicking a link follows it without changing the slide.
 
 The `split` and `image` layouts embed their image in the page.
 
-- **PNG, JPEG and WebP** are shrunk so the longest side is at most `image-max`. Smaller images
-  are never enlarged. JPEG and WebP are re-saved at quality 90 and turned upright using their
-  EXIF orientation.
+- **PNG, JPEG and WebP** are turned upright using their EXIF orientation, cropped to
+  `image-crop` if it's set, then shrunk so the longest side is at most `image-max`. Smaller
+  images are never enlarged. JPEG and WebP are re-saved at quality 90.
 - **SVG** is embedded unchanged.
 - **Mermaid** diagrams in a `.mmd` file are drawn as SVG by the page when it opens. akceo
   includes Mermaid, so nothing else needs installing. See [Mermaid diagrams](#mermaid-diagrams).
 
-Other formats stop the build.
+Other formats stop the build, and so does an image akceo can't process, such as one with
+damaged EXIF data.
+
+`image-crop` gives the part of the image to keep, in pixels counted from the top-left corner of
+the image as it appears, upright. `left` and `top` are the first column and row kept; `right` and
+`bottom` are the edges just past the last ones. So `image-crop: 120, 80, 920, 580` keeps an 800
+by 500 area, and `0, 0, W, H` keeps all of a W by H image. A photo stored sideways with an EXIF
+orientation counts in its upright size, which may not be the size other tools report.
+
+A crop that goes past the image's edge stops the build and gives the image's size, and its
+stored size too when EXIF turned it. A crop on an SVG or a Mermaid diagram also stops the build.
 
 ### Mermaid diagrams
 

@@ -218,11 +218,11 @@ flowchart TD
 | --- | --- |
 | `cli.py` | Parses arguments, runs a command, writes the output, turns `DeckError` into a message and exit code 1. `check` runs the build and writes nothing. |
 | `render.py` | Runs the build: loads the deck and theme, embeds images, checks diagrams, renders each slide, fills the page template |
-| `parse.py` | Turns Markdown into a validated `Deck`. All input rules live here. |
+| `parse.py` | Turns Markdown into a validated `Deck`. All input rules live here, except those that need the image itself, such as a crop past its edge, which `images.py` checks. |
 | `themes.py` | Finds a theme by name or path, checks that it sets every token, and reads the token values that Mermaid diagrams use |
-| `images.py` | Turns an image file into a `data:` URI, shrinking raster images |
+| `images.py` | Turns an image file into a `data:` URI, cropping and shrinking raster images |
 | `mermaid.py` | Checks each `.mmd` diagram with Mermaid's parser in V8, builds the theme's Mermaid config, and packs the vendored script for the page, with its license notices |
-| `files.py` | Reads user files, turning read and decode failures into `DeckError` |
+| `files.py` | Checks for and reads user files, turning read and decode failures into `DeckError` |
 | `errors.py` | `DeckError`, the one exception type the CLI reports to the user |
 
 ### The build pipeline
@@ -245,7 +245,7 @@ sequenceDiagram
             R->>M: diagram source
             M-->>R: ok, or DeckError with the diagram's line
         else any other image
-            R->>I: image path, image-max
+            R->>I: image path, image-max, image-crop
             I-->>R: data URI
         end
     end
@@ -355,14 +355,23 @@ flowchart TD
     check -->|"syntax error"| e3["DeckError with the<br/>diagram's line"]
     check -->|ok| src["Escaped source in a<br/>div for the page to draw"]
     mmd -->|no| svg{"SVG?"}
-    svg -->|yes| raw["Embed the bytes unchanged"]
+    svg -->|"yes, no crop"| raw["Embed the bytes unchanged"]
+    svg -->|"yes, with a crop"| e5["DeckError: can't crop an SVG"]
     svg -->|no| fmt{"PNG, JPEG or WebP?"}
     fmt -->|no| e2["DeckError: unsupported format"]
-    fmt -->|yes| fix["Rotate upright from EXIF,<br/>shrink to image-max,<br/>never enlarge"]
-    fix --> save["Re-save in the same format<br/>(JPEG and WebP at quality 90)"]
+    fmt -->|yes| upright["Rotate upright from EXIF"]
+    upright --> crop{"image-crop?"}
+    crop -->|"past the edge"| e4["DeckError giving the<br/>image's size"]
+    crop -->|inside| cut["Crop"]
+    crop -->|none| shrink["Shrink to image-max,<br/>never enlarge"]
+    cut --> shrink
+    shrink --> save["Re-save in the same format<br/>(JPEG and WebP at quality 90)"]
     raw --> uri["base64 data: URI in the img src"]
     save --> uri
 ```
+
+A step Pillow can't complete, such as reading damaged EXIF data, stops the build with "can't
+process image" and Pillow's reason.
 
 Images are processed on every build, so replacing an image file and rebuilding just works.
 
