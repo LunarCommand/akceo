@@ -187,8 +187,7 @@ def _check_links(path: Path, slide: Slide, count: int) -> None:
                 message = f"a link's URL can't continue onto the next line ('{written.replace(BREAK, '\\')}')"
                 raise _error(path, slide.line, f"slide {slide.number}: {message}")
             slide_link = SLIDE_LINK.fullmatch(url)
-            # The length check keeps int() inside its digit limit; no deck has a billion slides.
-            if slide_link and (len(slide_link.group(1)) > 9 or not 1 <= int(slide_link.group(1)) <= count):
+            if slide_link and not _names_a_slide(slide_link.group(1), count):
                 message = f"the link to {url} goes past the last slide, {count}"
                 raise _error(path, slide.line, f"slide {slide.number}: {message}")
             if not slide_link and not OUTSIDE_LINK.fullmatch(url):
@@ -198,6 +197,14 @@ def _check_links(path: Path, slide: Slide, count: int) -> None:
                     f"slide {slide.number}: can't link to '{written}'; a link goes to an https:, http: or "
                     "mailto: address, or to a slide as #N",
                 )
+
+
+def _names_a_slide(digits: str, count: int) -> bool:
+    """Whether #digits opens one of count slides. deck.js reads the hash with parseInt, so leading
+    zeros don't change the slide. The length check keeps int() inside its digit limit; no deck has
+    a billion slides."""
+    significant = digits.lstrip("0") or "0"
+    return len(significant) <= 9 and 1 <= int(significant) <= count
 
 
 def _error(path: Path, line: int, message: str) -> DeckError:

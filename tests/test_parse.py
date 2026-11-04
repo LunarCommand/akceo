@@ -428,6 +428,7 @@ def test_image_frame_errors(source: str, message: str):
         "- [docs](http://x.example)",
         "- [write](mailto:a@b.example)",
         "- [back](#1), [next](#2)",
+        "- [back](#0000000001)",
         "- `[not a link](javascript:x)`",
         "- [brackets] and (parentheses) on their own",
     ],
@@ -448,6 +449,7 @@ def test_allowed_links_parse(line: str):
         ("[x](#0)", "the link to #0 goes past the last slide, 2"),
         ("[x](#3)", "the link to #3 goes past the last slide, 2"),
         ("[x](#1234567890)", "the link to #1234567890 goes past the last slide, 2"),
+        ("[x](#0000000003)", "the link to #0000000003 goes past the last slide, 2"),
         # A code span must not hide a link from the check: the renderer still makes one.
         ("[`run`](javascript:alert%281%29)", "can't link to 'javascript:alert%281%29'"),
         ("[docs](https://x.example/`part`)", "can't link to 'https://x.example/`part`'"),
@@ -467,6 +469,12 @@ def test_a_slide_link_past_ints_digit_limit_goes_past_the_last_slide():
     number = "9" * 5000
     with pytest.raises(DeckError, match=f"the link to #{number} goes past the last slide, 1$"):
         parse(f"---\n## A\n\n- [x](#{number})\n", Path("deck.md"))
+
+
+def test_leading_zeros_dont_count_toward_a_slide_links_length():
+    # deck.js reads the hash with parseInt, so this opens slide 1. Checking the length before
+    # stripping the zeros would call it past the last slide.
+    deck(f"---\n## A\n\n- [x](#{'0' * 5000}1)\n")
 
 
 def test_links_are_checked_in_every_text_a_slide_shows():
