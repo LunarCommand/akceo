@@ -206,6 +206,7 @@ flowchart TD
     dimages --> images
     dimages --> shape["shape_data.py<br/>blocks()"]
     render --> mermaid["mermaid.py<br/>Checker, config(), notice(), packed()"]
+    dimages --> mermaid
     mermaid --> shape
     mermaid --> vendor[["assets/vendor/mermaid/<br/>mermaid.min.js · notices"]]
     render --> assets[["assets/<br/>page.html · base.css · deck.js · diagrams.js"]]
@@ -226,9 +227,9 @@ flowchart TD
 | `parse.py` | Turns Markdown into a validated `Deck`. All input rules live here, except those that need the image itself, such as a crop past its edge, which `images.py` checks. |
 | `themes.py` | Finds a theme by name or path, checks that it sets every token, and reads the token values that Mermaid diagrams use |
 | `images.py` | Turns an image file into a `data:` URI, cropping and shrinking raster images |
-| `diagram_images.py` | Puts each image file a diagram names in its shape data's `img:` into the diagram as a `data:` URI, through `images.py`, before the check |
-| `shape_data.py` | Reads the `@{…}` shape data in a diagram the way Mermaid does, keeping where each value is, for the inlining and the check |
-| `mermaid.py` | Checks each `.mmd` diagram with Mermaid's parser in V8, builds the theme's Mermaid config, and packs the vendored script for the page, with its license notices |
+| `diagram_images.py` | Puts each image file that Mermaid reads in a node's `img:` into the diagram as a `data:` URI, through `images.py`, before the check |
+| `shape_data.py` | Reads the `@{…}` shape data in a diagram the way Mermaid does, keeping where each value is, so the inlining can replace a value in place and the check can name its line |
+| `mermaid.py` | Checks each `.mmd` diagram with Mermaid's parser in V8 and reports each node's image as Mermaid reads it, builds the theme's Mermaid config, and packs the vendored script for the page, with its license notices |
 | `files.py` | Checks for and reads user files, turning read and decode failures into `DeckError` |
 | `errors.py` | `DeckError`, the one exception type the CLI reports to the user |
 
@@ -250,7 +251,9 @@ sequenceDiagram
     T-->>R: theme CSS
     loop each split or image slide with an image: line
         alt a .mmd diagram
-            R->>D: diagram source
+            R->>M: diagram source
+            M-->>R: each node's image, or DeckError with the diagram's line
+            R->>D: diagram source and its nodes' images
             D->>I: each img: file, with its crop and size
             I-->>D: data URI
             D-->>R: source with the files inlined, or DeckError with the diagram's line
@@ -363,10 +366,12 @@ flowchart TD
     start["image: file on a split or image slide"] --> exists{"File exists?"}
     exists -->|no| e1["DeckError: image not found"]
     exists -->|yes| mmd{".mmd?"}
-    mmd -->|yes| inline["Inline each img: file<br/>through the same steps"]
-    inline -->|"missing, or a bad option"| e6["DeckError with the<br/>diagram's line"]
-    inline --> check["Check with Mermaid's parser in V8"]
-    check -->|"syntax error"| e3["DeckError with the<br/>diagram's line"]
+    mmd -->|yes| read["Parse with Mermaid in V8,<br/>reading each node's image"]
+    read -->|"syntax error"| e3["DeckError with the<br/>diagram's line"]
+    read --> inline["Inline each img: file<br/>through the same steps"]
+    inline -->|"missing, a bad option,<br/>or not found in the text"| e6["DeckError with the<br/>diagram's line or node"]
+    inline --> check["Check the inlined source"]
+    check -->|"an outside link or load"| e7["DeckError with the<br/>diagram's line or node"]
     check -->|ok| src["Escaped source in a<br/>div for the page to draw"]
     mmd -->|no| svg{"SVG?"}
     svg -->|"yes, no crop"| raw["Embed the bytes unchanged"]
@@ -405,23 +410,30 @@ character's original line, to report the line in the file. A YAML error, from fr
 `@{…}` shape data, counts lines within that snippet instead. The check finds the snippet by parsing
 the front matter, and then each `@{…}` block, on its own, and adds the snippet's line.
 
-First, `diagram_images.py` replaces each file path in an `img:` value in `@{…}` shape data with
-the file's `data:` URI, read and shrunk by `images.data_uri` like a slide's image. The path
-resolves against the diagram's folder, and options after its `#` crop or size it. The URI has no
-line breaks, and a value that spanned lines is followed by as many, so every line keeps its
-number and Mermaid's errors still point at the file. The page gets this inlined source.
+The diagram is parsed twice. The first parse is of the file as written. A syntax error stops the
+build there, with Mermaid's message. Otherwise the worker also returns each flowchart node's
+`img`, `w` and `h` as Mermaid read them. Then `diagram_images.py` replaces each of those images
+that is a file path with the file's `data:` URI, read and shrunk by `images.data_uri` like a
+slide's image. The path resolves against the diagram's folder, options after its `#` crop or
+size it, and Mermaid's `w` and `h` give the size. The URI has no line breaks, and a value that
+spanned lines is followed by as many, so every line keeps its number and Mermaid's errors still
+point at the file. The page gets this inlined source, and the second parse checks it.
 
-Both the inlining and the check read shape data through `shape_data.py`, which follows Mermaid's
-rules. The block ends at the first `}` outside double quotes. Its inside is YAML: a flow mapping
-when it's on one line, a block mapping when it has line breaks, where a value can run on, sit on
-the next line or be a `|` or `>` block. Text inside a quoted label is never taken for a key. The
-tests hold the reader to what Mermaid itself reads for the same shape data.
+To replace a value, the inlining has to find it in the text. `shape_data.py` reads `@{…}` shape
+data following Mermaid's rules, with front matter, directives and comments blanked. The block
+ends at the first `}` outside double quotes. Its inside is YAML: a flow mapping when it's on one
+line, a block mapping when it has line breaks, where a value can run on, sit on the next line or
+be a `|` or `>` block. Only values Mermaid read as an image are replaced, so `@{…}` inside a
+label or a timeline is left alone. An image Mermaid read that the reader can't find stops the
+build, naming the node, instead of reaching the page as a broken image. The tests hold the
+reader to what Mermaid itself reads for the same shape data.
 
 Before parsing, a diagram longer than Mermaid's `maxTextSize` stops the build: `parse()` doesn't
 enforce that limit, but drawing does. The message lists how much each inlined image uses. After
 parsing, the whole source is scanned for links and
 loads that leave the deck (see [syntax.md](syntax.md#mermaid-diagrams)). Only `#` anchors and
-`data:` URIs pass.
+`data:` URIs pass. Image nodes are checked from Mermaid's own reading: by then each node's `img`
+must be a `data:` URI.
 
 The scan is there for the message. What keeps the page self-contained is the
 Content-Security-Policy in `page.html`, which lets the page run only its own inline scripts and

@@ -14,7 +14,7 @@ from PIL import Image
 from akceo import mermaid
 from akceo.diagram_images import inline
 from akceo.errors import DeckError
-from akceo.mermaid import Checker
+from akceo.mermaid import Checker, NodeImage
 
 FLOW = Path("flow.mmd")
 
@@ -49,6 +49,9 @@ def error(checker: Checker, source: str) -> str:
         'flowchart LR\n  a["see https://example.com"] --> b\n',
         'flowchart LR\n  a["Docs, img: https://example.com/guide"] --> b\n',
         'flowchart LR\n  b@{ label: "img: https://example.com/a.png", img: "data:image/png;base64,AA" }\n',
+        # Mermaid reads these as text, not as an image node.
+        'flowchart LR\n  a["see b@{ img: https://example.com/a.png }"] --> b\n',
+        "timeline\n  2024 : a node takes @{ img: https://example.com/a.png }\n",
         'flowchart LR\n  %% click a href "https://example.com"\n  a --> b\n',
         # A srcset of data: URIs only, whose own commas don't split it.
         "flowchart LR\n  a[\"<img srcset='data:image/png;base64,AAAA 1x, "
@@ -129,6 +132,8 @@ OUTSIDE = [
     ("flowchart LR\n  b@{\n    img:\n      https://x.example/p.png\n  }\n", 4, "https://x.example/p.png"),
     # An apostrophe inside a plain label doesn't open a quote.
     ("flowchart LR\n  b@{ label: It's me, img: 'https://x.example/q.png' }\n", 2, "https://x.example/q.png"),
+    # An img is never an anchor: the page would load it.
+    ('flowchart LR\n  b@{ img: "#top" }\n', 2, "#top"),
     # HTML in a label: src with a padded value, srcset, and a tag split over two lines.
     ("flowchart LR\n  a --> c[\"<img src=' https://x.example/l.png'/> L\"]\n", 2, "https://x.example/l.png"),
     ("flowchart LR\n  a --> c[\"<img srcset='https://x.example/s.png'> L\"]\n", 2, "https://x.example/s.png"),
@@ -182,6 +187,24 @@ def test_diagrams_cant_load_or_link_outside_the_deck(checker: Checker, source: s
     )
 
 
+def test_an_outside_image_akceo_cant_find_names_its_node(checker: Checker):
+    # Mermaid reads YAML's explicit key as img; the shape-data reader doesn't, so there's no line.
+    assert error(checker, "flowchart LR\n  a --> b\n  b@{ ? img : https://x.example/i.png }\n") == (
+        "flow.mmd: node b: a diagram can't load or link to anything outside the deck "
+        "(https://x.example/i.png); give an image as a file path in img: or a data: URI, and a link as "
+        "a #anchor, such as #3 for slide 3"
+    )
+
+
+def test_images_are_read_by_mermaid(checker: Checker):
+    source = 'flowchart LR\n  a@{ img: x.png, w: 1e2 }\n  b@{ img: "data:,", h: "60" }\n  c@{ w: 5 }\n'
+    assert checker.images(FLOW, source) == [
+        NodeImage("a", "x.png", 100, None),
+        NodeImage("b", "data:,", None, 60),
+    ]
+    assert checker.images(FLOW, "sequenceDiagram\n  A->>B: hi\n") == []
+
+
 def test_a_diagram_too_long_for_mermaid_to_draw(checker: Checker):
     source = "flowchart LR\n" + "".join(f"  n{i} --> n{i + 1}\n" for i in range(3500))
     size = len(source)
@@ -198,7 +221,7 @@ def test_inlined_images_pass_the_check(checker: Checker, tmp_path: Path):
     source = (
         'flowchart LR\n  a@{ img: "shot.png", label: "Shot", pos: "b", w: 40 }\n  a --> b@{ img: logo.svg }\n'
     )
-    inlined_source, inlined = inline(tmp_path / "flow.mmd", source)
+    inlined_source, inlined = inline(tmp_path / "flow.mmd", source, checker.images(FLOW, source))
     assert [image.name for image in inlined] == ["shot.png", "logo.svg"]
     checker.check(FLOW, inlined_source, inlined)
 
@@ -208,7 +231,7 @@ def test_a_diagram_too_long_with_its_images_inlined_names_them(checker: Checker,
     Image.frombytes("RGB", (150, 150), random.Random(0).randbytes(150 * 150 * 3)).save(tmp_path / "noise.png")
     Image.new("RGB", (40, 20)).save(tmp_path / "small.png")
     source = 'flowchart LR\n  a@{ img: "small.png" }\n  a --> b@{ img: "noise.png" }\n'
-    inlined_source, inlined = inline(tmp_path / "flow.mmd", source)
+    inlined_source, inlined = inline(tmp_path / "flow.mmd", source, checker.images(FLOW, source))
     small, noise = inlined
     with pytest.raises(DeckError) as e:
         checker.check(FLOW, inlined_source, inlined)

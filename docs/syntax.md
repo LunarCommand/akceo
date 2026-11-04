@@ -211,7 +211,7 @@ the way Mermaid takes any value in shape data: in double or single quotes, or ba
 
 ```
 flowchart LR
-  a --> b@{ img: "screenshot.png", label: "The new form", w: 300 }
+  a --> b@{ img: "screenshot.png", label: "The new form", w: 300, constraint: "on" }
 ```
 
 The build reads the file and puts it into the diagram as a `data:` URI, the same way it embeds a
@@ -219,9 +219,20 @@ slide's image: PNG, JPEG and WebP are turned upright and re-saved, and SVG goes 
 missing file stops the build with its path and the line in the `.mmd` file. A `data:` URI is
 used as it is.
 
-Mermaid draws an image at the node's `w` and `h` if the node sets them, and at the image's own
-size if it doesn't. So when the node sets `w` or `h`, the image is shrunk to twice that, which
-stays sharp on a high-density screen. When it sets neither, the image keeps its size.
+The build asks Mermaid which nodes have an image, so `@{ img: … }` inside a label is only text.
+It then finds each image in the `.mmd` file to replace it. An image Mermaid reads that akceo
+can't find there, such as one given through a YAML anchor, stops the build naming its node.
+Write it on one line, as above.
+
+Mermaid stretches an image to fill its node's box. The box takes the node's `w` and `h`, and the
+image's own size in pixels for a side the node doesn't set. With `constraint: "on"` and only `w`
+or `h`, Mermaid works out the other side from the image's shape instead. So to keep an image in
+proportion, set `w` with `constraint: "on"`, as above, or set both. A node with a label is at
+least 120 pixels wide.
+
+When the node sets `w` or `h`, the image is shrunk to twice that, which stays sharp on a
+high-density screen. When it sets neither, the image keeps its size. An image that several nodes
+use is sized for the largest.
 
 Two options after a `#` on the path change that. Join them with `&`, and quote a path that has
 any:
@@ -229,14 +240,15 @@ any:
 | Option | Meaning |
 | --- | --- |
 | `crop=left,top,right,bottom` | Keep only part of the image, in pixels, as `image-crop` does for a slide's image. |
-| `max=pixels` | Shrink the image so its longest side is at most this many pixels, instead of fitting it to twice `w` and `h`. In a node with neither, Mermaid draws it at this size. |
+| `max=pixels` | Shrink the image so its longest side is at most this many pixels, instead of fitting it to twice `w` and `h`. In a node without a label that sets neither, Mermaid draws it at this size. Not for SVG: set the node's `w` and `h` instead. |
 
 ```
 flowchart LR
-  a --> b@{ img: "screenshot.png#crop=0,0,1200,800&max=600", w: 300 }
+  a --> b@{ img: "screenshot.png#crop=0,0,1200,800&max=600", w: 300, constraint: "on" }
 ```
 
-A file whose name contains `#` can't be used.
+A file whose name contains `#` can't be used, and neither can a path that's only options, such
+as `img: "#max=300"`.
 
 Each image counts toward Mermaid's 50,000-character limit on the diagram, at about four
 characters for every three bytes of the image, and an image used twice counts twice. Over the

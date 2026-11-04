@@ -127,6 +127,36 @@ def test_diagram_image_errors_name_the_slide_and_the_diagram_line(
     )
 
 
+LONG = 'flowchart LR\n  a@{ img: "gone.png" }\n' + "".join(f"  n{i} --> n{i + 1}\n" for i in range(3500))
+
+
+@pytest.mark.parametrize(
+    ("diagram", "message"),
+    [
+        # Mermaid's own error, not 'image not found' for a path the broken YAML ran together.
+        (
+            "flowchart LR\n  a@{ img: shot.png, label: Shot,\n      w: 40 }\n",
+            ":2: bad indentation of a mapping entry",
+        ),
+        # Too long already, so its shape data isn't read at all.
+        (
+            LONG,
+            f": the diagram is {len(LONG):,} characters long, over Mermaid's limit of 50,000; split it into "
+            "smaller diagrams",
+        ),
+    ],
+    ids=["yaml-error", "too-long"],
+)
+def test_a_diagram_is_checked_before_its_images_are_read(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], diagram: str, message: str
+):
+    (tmp_path / "flow.mmd").write_text(diagram)
+    deck = tmp_path / "deck.md"
+    deck.write_text("---\nlayout: image\nimage: flow.mmd\n")
+    assert main(["check", str(deck)]) == 1
+    assert capsys.readouterr().err == f"akceo: {deck}:2: slide 1: {tmp_path / 'flow.mmd'}{message}\n"
+
+
 def test_image_crop_reaches_the_page(tmp_path: Path):
     Image.new("RGB", (400, 200)).save(tmp_path / "fig.png")
     (tmp_path / "deck.md").write_text("---\nlayout: image\nimage: fig.png\nimage-crop: 100, 50, 300, 150\n")

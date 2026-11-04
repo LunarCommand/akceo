@@ -9,8 +9,8 @@ dependencies are Pillow (images) and mini-racer (V8, to check Mermaid diagrams a
   except those that need the image itself, such as a crop past its edge, which `images.py` makes.
 - `src/akceo/render.py`: slides to HTML, inline markup, page assembly.
 - `src/akceo/images.py`: image files to data URIs, cropped and shrunk.
-- `src/akceo/diagram_images.py`: puts the image files a diagram's `img:` shape data names into the
-  diagram as data URIs, before the check.
+- `src/akceo/diagram_images.py`: puts the image files that Mermaid reads in a diagram's `img:` shape
+  data into the diagram as data URIs, before the check.
 - `src/akceo/shape_data.py`: reads a diagram's `@{…}` shape data the way Mermaid does, keeping each
   value's place in the source. `tests/test_shape_data.py` compares it with Mermaid's own reading.
 - `src/akceo/mermaid.py`: the build-time diagram check (V8 in a child process it runs as

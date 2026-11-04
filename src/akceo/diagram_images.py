@@ -3,14 +3,14 @@ without loading anything. The syntax is in docs/syntax.md#images-in-diagrams."""
 
 import math
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 from akceo import images, parse, shape_data
 from akceo.errors import DeckError
-from akceo.mermaid import COMMENT
+from akceo.mermaid import NodeImage, blank_removed
 
-NUMBER = re.compile(r"[0-9]+(?:\.[0-9]+)?")
 SCHEME = re.compile(r"[a-z][a-z0-9+.-]*:", re.IGNORECASE)
 OPTIONS = ("crop", "max")
 # A node with w but no h, or h but no w, is shrunk along that side only.
@@ -27,53 +27,74 @@ class Inlined:
     size: int
 
 
-def inline(path: Path, source: str) -> tuple[str, list[Inlined]]:
-    """source with each img: file path in its shape data replaced by the file's data: URI, and the
-    images inlined. A path resolves against the diagram's folder. A data: URI or a URL is left for
-    the check to pass or refuse, and %% comments are skipped.
+def inline(path: Path, source: str, nodes: Sequence[NodeImage]) -> tuple[str, list[Inlined]]:
+    """source with each img: file path in it replaced by the file's data: URI, and the images
+    inlined. nodes are the node images Mermaid reads in source, and only those values are replaced,
+    so @{…} in a label is left alone. A path resolves against the diagram's folder. A data: URI or a
+    URL is left for the check to pass or refuse.
 
     The URI has no line breaks, and a value that spanned lines is followed by as many, so every line
     stays where it was and Mermaid's errors still point at the right line of the diagram file."""
-    text = COMMENT.sub(lambda m: re.sub(r"[^\n]", " ", m.group()), source)
+    by_value: dict[str, list[NodeImage]] = {}
+    for node in nodes:
+        value = node.img.strip()
+        if not SCHEME.match(value) and not value.startswith("//"):
+            by_value.setdefault(node.img, []).append(node)
+    found = [
+        entry
+        for entries in shape_data.blocks(blank_removed(source))
+        for entry in entries
+        if entry.key == "img" and entry.value in by_value
+    ]
+    for value, using in by_value.items():
+        if not any(entry.value == value for entry in found):
+            raise DeckError(
+                f"{path}: akceo can't tell where node {using[0].node}'s img: {value.strip()} is written, "
+                f'to put the file in; write it on one line, such as img: "{value.strip()}"'
+            )
     edits: list[tuple[int, int, str]] = []
     inlined: list[Inlined] = []
-    for entries in shape_data.blocks(text):
-        sizes = {
-            e.key: float(e.value.strip())
-            for e in entries
-            if e.key in "wh" and NUMBER.fullmatch(e.value.strip())
-        }
-        for entry in entries:
-            value = entry.value.strip()
-            if entry.key != "img" or not value or SCHEME.match(value) or value.startswith(("#", "//")):
-                continue
-            line = source.count("\n", 0, entry.start) + 1
-            if entry.plain and "#" in value:
-                example = f'img: "{value.partition("#")[0]}#crop=120,80,920,580"'
-                raise DeckError(f"{path}:{line}: quote an img: path that has options, such as {example}")
-            name, uri = _encode(path, value, sizes, line)
-            edits.append(
-                (entry.start, entry.end, f'"{uri}"' + "\n" * source.count("\n", entry.start, entry.end))
-            )
-            inlined.append(Inlined(name, line, len(uri)))
+    for entry in found:
+        value = entry.value.strip()
+        line = source.count("\n", 0, entry.start) + 1
+        if value.startswith("#"):
+            example = f'img: "shot.png{value}"'
+            raise DeckError(f"{path}:{line}: an img: needs a file path before its #, such as {example}")
+        if entry.plain and "#" in value:
+            example = f'img: "{value.partition("#")[0]}#crop=120,80,920,580"'
+            raise DeckError(f"{path}:{line}: quote an img: path that has options, such as {example}")
+        name, uri = _encode(path, value, _box(by_value[entry.value]), line)
+        edits.append((entry.start, entry.end, f'"{uri}"' + "\n" * source.count("\n", entry.start, entry.end)))
+        inlined.append(Inlined(name, line, len(uri)))
     for start, end, new in reversed(edits):
         source = source[:start] + new + source[end:]
     return source, inlined
 
 
-def _encode(path: Path, value: str, sizes: dict[str, float], line: int) -> tuple[str, str]:
-    """The file name in value and its data: URI. max= sets the longest side; otherwise the image
-    fits twice the node's w and h, or keeps its size when the node sets neither, since Mermaid then
-    draws it at its own size."""
+def _box(using: Sequence[NodeImage]) -> tuple[int, int] | None:
+    """The size to fit an image into: twice the node's w and h, or None to keep its size when the
+    node sets neither, since Mermaid then draws it at its own size. An image several nodes use is
+    sized for the largest."""
+    box = (max(_twice(node.w) for node in using), max(_twice(node.h) for node in using))
+    return None if box == (UNBOUNDED, UNBOUNDED) else box
+
+
+def _twice(size: float | None) -> int:
+    return math.ceil(2 * size) if size and 0 < 2 * size < UNBOUNDED else UNBOUNDED
+
+
+def _encode(path: Path, value: str, box: tuple[int, int] | None, line: int) -> tuple[str, str]:
+    """The file name in value and its data: URI. max= after the name sets the longest side instead
+    of box."""
     name, mark, options = value.partition("#")
     try:
         crop, max_px = _options(options) if mark else (None, None)
         if max_px:
+            if name.lower().endswith(".svg"):
+                raise DeckError(
+                    f"max= can't shrink an SVG image, so set the node's w and h instead: {path.parent / name}"
+                )
             box = (max_px, max_px)
-        elif sizes:
-            box = (_twice(sizes.get("w")), _twice(sizes.get("h")))
-        else:
-            box = None
         return name, images.data_uri(path.parent / name, box, crop)
     except DeckError as e:
         raise DeckError(f"{path}:{line}: {e}") from None
@@ -98,7 +119,3 @@ def _options(text: str) -> tuple[tuple[int, int, int, int] | None, int | None]:
         else:
             max_px = parse.pixel_count(value, "max")
     return crop, max_px
-
-
-def _twice(size: float | None) -> int:
-    return math.ceil(2 * size) if size else UNBOUNDED

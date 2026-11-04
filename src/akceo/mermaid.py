@@ -18,6 +18,7 @@ import sys
 import threading
 import zlib
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 from types import TracebackType
@@ -27,7 +28,7 @@ from akceo import shape_data
 from akceo.errors import DeckError
 
 if TYPE_CHECKING:
-    # diagram_images imports this module's patterns, so the import only runs for the type checker.
+    # diagram_images imports from this module, so this import only runs for the type checker.
     from akceo.diagram_images import Inlined
 
 ASSETS = resources.files("akceo") / "assets"
@@ -76,6 +77,17 @@ UNKNOWN_SHAPE = re.compile(r"No such shape: (.+?)\.?$")
 YAML_POSITION = re.compile(r"\s*\(\d+:\d+\)$")
 
 
+@dataclass(frozen=True)
+class NodeImage:
+    """A flowchart node's image as Mermaid reads it: the node's id, its img, and its w and h, which
+    are None when the node doesn't set them or Mermaid can't read them as a number."""
+
+    node: str
+    img: str
+    w: float | None
+    h: float | None
+
+
 class Checker:
     """Checks diagrams in one child process, started on the first check. Use it as a context
     manager, so the child is stopped when the build ends or fails."""
@@ -99,27 +111,42 @@ class Checker:
             self._worker.wait()
             self._worker = None
 
-    def check(self, path: Path, source: str, images: Sequence["Inlined"] = ()) -> None:
+    def images(self, path: Path, source: str) -> list[NodeImage]:
+        """The image of each node in source, as Mermaid reads it. Raise a DeckError naming the line
+        in path when source is too long for Mermaid to draw or Mermaid can't parse it."""
+        return self._read(path, source, ())
+
+    def check(self, path: Path, source: str, inlined: Sequence["Inlined"] = ()) -> None:
         """Raise a DeckError naming the line in path when Mermaid can't parse source, when it's too
-        long for Mermaid to draw, or when it links to or loads anything outside the deck. images are
-        the image files inlined into source, which the too-long error names."""
+        long for Mermaid to draw, or when it links to or loads anything outside the deck. inlined
+        are the image files put into source, which the too-long error names."""
+        images = self._read(path, source, inlined)
+        outside = outside_reference(source)
+        if outside:
+            where, url = f"{path}:{outside[0]}", outside[1]
+        else:
+            image = next((i for i in images if not i.img.strip().lower().startswith("data:")), None)
+            if image is None:
+                return
+            line = image_line(source, image.img)
+            where, url = f"{path}:{line}" if line else f"{path}: node {image.node}", image.img.strip()
+        raise DeckError(
+            f"{where}: a diagram can't load or link to anything outside the deck ({url}); give an image "
+            "as a file path in img: or a data: URI, and a link as a #anchor, such as #3 for slide 3"
+        )
+
+    def _read(self, path: Path, source: str, inlined: Sequence["Inlined"]) -> list[NodeImage]:
         self._start(path)
         # Mermaid counts JavaScript string length, in UTF-16 units, of the text the page hands it,
         # where the HTML parser has already turned \r\n into \n.
         size = len(source.replace("\r\n", "\n").encode("utf-16-le")) // 2
         if size > self._max_text_size:
-            raise DeckError(_too_long(path, size, self._max_text_size, images))
-        error = self._parse(path, source)
-        if error is not None:
+            raise DeckError(_too_long(path, size, self._max_text_size, inlined))
+        answer = self._parse(path, source)
+        if "error" in answer:
+            error = answer["error"]
             raise DeckError(explain(path, source, error["message"], self._locate(path, source, error)))
-        outside = outside_reference(source)
-        if outside:
-            line, url = outside
-            raise DeckError(
-                f"{path}:{line}: a diagram can't load or link to anything outside the deck ({url}); "
-                "give an image as a file path in img: or a data: URI, and a link as a #anchor, such as "
-                "#3 for slide 3"
-            )
+        return [NodeImage(i["node"], i["img"], i.get("w"), i.get("h")) for i in answer["images"]]
 
     def _start(self, path: Path) -> None:
         if self._worker is not None:
@@ -133,8 +160,9 @@ class Checker:
         ready = self._answer(path, START_TIMEOUT, "load Mermaid")
         self._max_text_size = int(ready["max_text_size"])
 
-    def _parse(self, path: Path, source: str) -> dict[str, Any] | None:
-        """Mermaid's error for source as a dict (name, message, yamlLine), or None if it parses."""
+    def _parse(self, path: Path, source: str) -> dict[str, Any]:
+        """Mermaid's answer for source: its error as a dict (name, message, yamlLine) under error,
+        or the nodes' images under images."""
         self._start(path)
         assert self._worker is not None and self._worker.stdin is not None
         try:
@@ -142,7 +170,7 @@ class Checker:
             self._worker.stdin.flush()
         except BrokenPipeError:
             pass  # the worker has stopped; _answer reports it
-        return self._answer(path, PARSE_TIMEOUT, "check the diagram")["error"]
+        return self._answer(path, PARSE_TIMEOUT, "check the diagram")
 
     def _answer(self, path: Path, timeout: float, task: str) -> dict[str, Any]:
         try:
@@ -166,12 +194,12 @@ class Checker:
             return None
         front = FRONT_MATTER.match(source)
         if front:
-            found = self._parse(path, front.group(0) + "info\n")
+            found = self._parse(path, front.group(0) + "info\n").get("error")
             if found is not None and found["name"] == "YAMLException":
                 body_lines = front.group(2).count("\n") + 1
                 return 2 + min(max(found["yamlLine"] or 0, 0), body_lines - 1)
         for block in shape_data.BLOCK.finditer(source):
-            found = self._parse(path, "flowchart LR\n  x" + block.group(0) + "\n")
+            found = self._parse(path, "flowchart LR\n  x" + block.group(0) + "\n").get("error")
             if found is not None and found["name"] == "YAMLException":
                 # Mermaid wraps the block's inside in { and }, so its line 1 is the block's first.
                 block_lines = block.group(0).count("\n") + 1
@@ -200,7 +228,8 @@ def _serve() -> None:
             promise = ctx.eval(f"akceoCheck({json.dumps(json.loads(line)['source'])})")
             assert isinstance(promise, JSPromise)
             result = promise.get()
-            _send({"error": json.loads(result) if isinstance(result, str) else None})
+            assert isinstance(result, str)
+            _send(json.loads(result))
     except KeyboardInterrupt:
         pass  # Ctrl-C reaches the worker too; the build reports it
     # Skip interpreter shutdown: an open mini-racer context can hang it, and there's nothing to save.
@@ -233,15 +262,43 @@ def _line_at(source: str, index: int) -> int:
     return source.count("\n", 0, index) + 1
 
 
+def image_line(source: str, img: str) -> int | None:
+    """The line of the first img: in source's shape data whose value is img, or None if the reader
+    can't find one."""
+    for entries in shape_data.blocks(blank_removed(source)):
+        for entry in entries:
+            if entry.key == "img" and entry.value == img:
+                return _line_at(source, entry.start)
+    return None
+
+
+def blank_comments(source: str) -> str:
+    """source with each %% comment blanked, keeping its line breaks."""
+    return COMMENT.sub(lambda m: _blank(m.group()), source)
+
+
+def blank_removed(source: str) -> str:
+    """source with what Mermaid removes before parsing blanked, keeping line breaks: front matter,
+    %%{init}%% directives and %% comments."""
+    front = FRONT_MATTER.match(source)
+    text = _blank(front.group()) + source[front.end() :] if front else source
+    return blank_comments(DIRECTIVE.sub(lambda m: _blank(m.group()), text))
+
+
+def _blank(text: str) -> str:
+    return re.sub(r"[^\n]", " ", text)
+
+
 def outside_reference(source: str) -> tuple[int, str] | None:
     """The line and URL of the first place the diagram links to, or loads, something outside the
-    page. Links may only be #anchors and loads only data: URIs: a relative path would point next to
-    deck.html and break once the deck is copied. A URL that is only text in a label is fine.
+    page, other than an image node's img, which the check takes from Mermaid's own reading. Links
+    may only be #anchors and loads only data: URIs: a relative path would point next to deck.html
+    and break once the deck is copied. A URL that is only text in a label is fine.
 
     The whole source is scanned, so a tag split over lines is still seen. %% comments are blanked
     first, keeping their line breaks, but directives and front matter are scanned: themeCSS there
     can load images and fonts."""
-    text = COMMENT.sub(lambda m: re.sub(r"[^\n]", " ", m.group()), source)
+    text = blank_comments(source)
     links = [(m.start(1), m.group(1)) for pattern in LINKS for m in pattern.finditer(text)]
     links += [
         (block.start(1) + m.start(1), m.group(1))
@@ -255,12 +312,6 @@ def outside_reference(source: str) -> tuple[int, str] | None:
         for pattern in SRCSET
         for m in pattern.finditer(text)
         for index, url in _srcset_urls(m.group(2))
-    ]
-    loads += [
-        (entry.start, entry.value.strip())
-        for entries in shape_data.blocks(text)
-        for entry in entries
-        if entry.key == "img"
     ]
     found += [
         (index, url)

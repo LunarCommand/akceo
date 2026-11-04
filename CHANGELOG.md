@@ -42,9 +42,10 @@ All notable changes to this project are documented here. The format follows
   declares a huge size. These used to crash with a Python traceback.
 - An image or diagram whose file name is too long for the system is reported as not found. It
   used to crash with a Python traceback.
-- The diagram check reads `@{…}` shape data the way Mermaid does. Text such as `img: https://…`
-  inside a quoted label no longer stops the build as an outside image, and a `}` inside a quoted
-  label no longer hides the rest of the shape data from the check.
+- The diagram check takes each image node's `img:` from Mermaid's own reading of the diagram.
+  Text that only looks like one, such as `img: https://…` inside a label, no longer stops the
+  build as an outside image, and an image the old scan missed, such as one after a `}` inside a
+  quoted label, now stops it.
 
 ## [0.2.1] - 2026-10-30
 
