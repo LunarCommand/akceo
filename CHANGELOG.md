@@ -17,6 +17,12 @@ All notable changes to this project are documented here. The format follows
 - `image-crop: left, top, right, bottom` on split and image slides keeps only that part of a
   PNG, JPEG or WebP image, in pixels, before it's shrunk to `image-max`. A crop past the image's
   edge stops the build and gives the image's size.
+- An image shape in a Mermaid diagram can name an image file: `img: "screenshot.png"`, relative
+  to the `.mmd` file. The build puts it into the diagram as a `data:` URI, so it no longer has
+  to be pasted in as base64. When the node sets `w` or `h`, the image is shrunk to twice that.
+  `#crop=` and `#max=` after the path crop or size it. A missing file stops the build with the
+  diagram's line, and a diagram that its images push over Mermaid's 50,000-character limit
+  stops with how much each image uses (#21).
 
 ### Changed
 
@@ -36,6 +42,10 @@ All notable changes to this project are documented here. The format follows
   declares a huge size. These used to crash with a Python traceback.
 - An image or diagram whose file name is too long for the system is reported as not found. It
   used to crash with a Python traceback.
+- The diagram check takes each image node's `img:` from Mermaid's own reading of the diagram.
+  Text that only looks like one, such as `img: https://…` inside a label, no longer stops the
+  build as an outside image, and an image the old scan missed, such as one after a `}` inside a
+  quoted label, now stops it.
 
 ## [0.2.1] - 2026-10-30
 
