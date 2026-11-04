@@ -203,6 +203,7 @@ flowchart TD
     themes --> files
     render --> images["images.py<br/>data_uri()"]
     render --> mermaid["mermaid.py<br/>Checker, config(), notice(), packed()"]
+    mermaid --> shape["shape_data.py<br/>blocks()"]
     mermaid --> vendor[["assets/vendor/mermaid/<br/>mermaid.min.js · notices"]]
     render --> assets[["assets/<br/>page.html · base.css · deck.js · diagrams.js"]]
     themes --> builtin[["themes/<br/>midnight.css · paper.css"]]
@@ -221,6 +222,7 @@ flowchart TD
 | `parse.py` | Turns Markdown into a validated `Deck`. All input rules live here, except those that need the image itself, such as a crop past its edge, which `images.py` checks. |
 | `themes.py` | Finds a theme by name or path, checks that it sets every token, and reads the token values that Mermaid diagrams use |
 | `images.py` | Turns an image file into a `data:` URI, cropping and shrinking raster images |
+| `shape_data.py` | Reads the `@{…}` shape data in a diagram the way Mermaid does, keeping where each value is, for the check |
 | `mermaid.py` | Checks each `.mmd` diagram with Mermaid's parser in V8, builds the theme's Mermaid config, and packs the vendored script for the page, with its license notices |
 | `files.py` | Checks for and reads user files, turning read and decode failures into `DeckError` |
 | `errors.py` | `DeckError`, the one exception type the CLI reports to the user |
@@ -390,6 +392,12 @@ so the line in its errors counts without them. `mermaid.py` repeats those steps,
 character's original line, to report the line in the file. A YAML error, from front matter or
 `@{…}` shape data, counts lines within that snippet instead. The check finds the snippet by parsing
 the front matter, and then each `@{…}` block, on its own, and adds the snippet's line.
+
+The check reads shape data through `shape_data.py`, which follows Mermaid's rules. The block
+ends at the first `}` outside double quotes. Its inside is YAML: a flow mapping when it's on one
+line, a block mapping when it has line breaks, where a value can run on, sit on the next line or
+be a `|` or `>` block. Text inside a quoted label is never taken for a key. The tests hold the
+reader to what Mermaid itself reads for the same shape data.
 
 Before parsing, a diagram longer than Mermaid's `maxTextSize` stops the build: `parse()` doesn't
 enforce that limit, but drawing does. After parsing, the whole source is scanned for links and

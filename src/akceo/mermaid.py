@@ -23,6 +23,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import IO, Any
 
+from akceo import shape_data
 from akceo.errors import DeckError
 
 ASSETS = resources.files("akceo") / "assets"
@@ -63,8 +64,6 @@ SRCSET = [
     re.compile(r"""<[a-z][^>]*?\bsrcset\s*=\s*\\?(["'])(.*?)\\?\1""", re.IGNORECASE | re.DOTALL),
     re.compile(r"""<[a-z][^>]*?\bsrcset\s*=\s*()([^"'\\\s>]+)""", re.IGNORECASE),
 ]
-SHAPE_DATA = re.compile(r"@\{.*?\}", re.DOTALL)
-IMAGE_KEY = re.compile(r"""\\?["']?\bimg\\?["']?\s*:\s*\\?["']?\s*([^"'\\,}\s]*)""")
 
 LINE_REF = re.compile(r"\bline (\d+)")
 JISON_ERROR = re.compile(r"(Parse|Lexical) error on line (\d+)[:.]?\s*(.*)", re.DOTALL)
@@ -168,7 +167,7 @@ class Checker:
             if found is not None and found["name"] == "YAMLException":
                 body_lines = front.group(2).count("\n") + 1
                 return 2 + min(max(found["yamlLine"] or 0, 0), body_lines - 1)
-        for block in SHAPE_DATA.finditer(source):
+        for block in shape_data.BLOCK.finditer(source):
             found = self._parse(path, "flowchart LR\n  x" + block.group(0) + "\n")
             if found is not None and found["name"] == "YAMLException":
                 # Mermaid wraps the block's inside in { and }, so its line 1 is the block's first.
@@ -238,9 +237,10 @@ def outside_reference(source: str) -> tuple[int, str] | None:
         for index, url in _srcset_urls(m.group(2))
     ]
     loads += [
-        (block.start() + m.start(1), m.group(1))
-        for block in SHAPE_DATA.finditer(text)
-        for m in IMAGE_KEY.finditer(block.group(0))
+        (entry.start, entry.value.strip())
+        for entries in shape_data.blocks(text)
+        for entry in entries
+        if entry.key == "img"
     ]
     found += [
         (index, url)

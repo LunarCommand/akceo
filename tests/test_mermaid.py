@@ -45,6 +45,7 @@ def error(checker: Checker, source: str) -> str:
         'flowchart LR\n  b@{ img: "data:image/png;base64,AAAA", label: "L" }\n',
         'flowchart LR\n  a["see https://example.com"] --> b\n',
         'flowchart LR\n  a["Docs, img: https://example.com/guide"] --> b\n',
+        'flowchart LR\n  b@{ label: "img: https://example.com/a.png", img: "data:image/png;base64,AA" }\n',
         'flowchart LR\n  %% click a href "https://example.com"\n  a --> b\n',
         # A srcset of data: URIs only, whose own commas don't split it.
         "flowchart LR\n  a[\"<img srcset='data:image/png;base64,AAAA 1x, "
@@ -119,6 +120,10 @@ OUTSIDE = [
     ),
     ('flowchart LR\n  b@{ "img": "https://x.example/i.png", label: "L" }\n', 2, "https://x.example/i.png"),
     ('flowchart LR\n  b@{\n    label: "L"\n    img: "pic.png"\n  }\n', 4, "pic.png"),
+    # Shape data is read as Mermaid reads it: a } in a quoted label doesn't end it, and a value can
+    # be unquoted or on the next line.
+    ('flowchart LR\n  b@{ label: "a } b", img: "https://x.example/i.png" }\n', 2, "https://x.example/i.png"),
+    ("flowchart LR\n  b@{\n    img:\n      https://x.example/p.png\n  }\n", 4, "https://x.example/p.png"),
     # HTML in a label: src with a padded value, srcset, and a tag split over two lines.
     ("flowchart LR\n  a --> c[\"<img src=' https://x.example/l.png'/> L\"]\n", 2, "https://x.example/l.png"),
     ("flowchart LR\n  a --> c[\"<img srcset='https://x.example/s.png'> L\"]\n", 2, "https://x.example/s.png"),
