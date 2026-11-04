@@ -6,7 +6,7 @@ import re
 from importlib import resources
 from pathlib import Path
 
-from akceo import files, images, mermaid, parse, themes
+from akceo import diagram_images, files, images, mermaid, parse, themes
 from akceo.errors import DeckError
 from akceo.parse import BREAK, Deck, Slide
 
@@ -73,7 +73,7 @@ def _image_src(deck: Deck, slide: Slide, images_dir: Path) -> str:
     max_px = int(slide.meta.get("image-max", DEFAULT_IMAGE_MAX))
     try:
         crop = parse.crop_box(slide.meta["image-crop"], "image-crop") if "image-crop" in slide.meta else None
-        return images.data_uri(images_dir / slide.meta["image"], max_px, crop)
+        return images.data_uri(images_dir / slide.meta["image"], (max_px, max_px), crop)
     except DeckError as e:
         raise deck.error(slide, str(e)) from None
 
@@ -86,8 +86,8 @@ def _diagram(deck: Deck, slide: Slide, images_dir: Path, checker: mermaid.Checke
     try:
         if not files.is_file(path):
             raise DeckError(f"image not found: {path}")
-        source = files.read_text(path, "diagram")
-        checker.check(path, source)
+        source, inlined = diagram_images.inline(path, files.read_text(path, "diagram"))
+        checker.check(path, source, inlined)
     except DeckError as e:
         raise deck.error(slide, str(e)) from None
     return source

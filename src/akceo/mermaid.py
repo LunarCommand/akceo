@@ -17,14 +17,18 @@ import subprocess
 import sys
 import threading
 import zlib
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from importlib import resources
 from pathlib import Path
 from types import TracebackType
-from typing import IO, Any
+from typing import IO, TYPE_CHECKING, Any
 
 from akceo import shape_data
 from akceo.errors import DeckError
+
+if TYPE_CHECKING:
+    # diagram_images imports this module's patterns, so the import only runs for the type checker.
+    from akceo.diagram_images import Inlined
 
 ASSETS = resources.files("akceo") / "assets"
 VENDOR = ASSETS / "vendor" / "mermaid"
@@ -95,18 +99,16 @@ class Checker:
             self._worker.wait()
             self._worker = None
 
-    def check(self, path: Path, source: str) -> None:
+    def check(self, path: Path, source: str, images: Sequence["Inlined"] = ()) -> None:
         """Raise a DeckError naming the line in path when Mermaid can't parse source, when it's too
-        long for Mermaid to draw, or when it links to or loads anything outside the deck."""
+        long for Mermaid to draw, or when it links to or loads anything outside the deck. images are
+        the image files inlined into source, which the too-long error names."""
         self._start(path)
         # Mermaid counts JavaScript string length, in UTF-16 units, of the text the page hands it,
         # where the HTML parser has already turned \r\n into \n.
         size = len(source.replace("\r\n", "\n").encode("utf-16-le")) // 2
         if size > self._max_text_size:
-            raise DeckError(
-                f"{path}: the diagram is {size:,} characters long, over Mermaid's limit of "
-                f"{self._max_text_size:,}; split it into smaller diagrams"
-            )
+            raise DeckError(_too_long(path, size, self._max_text_size, images))
         error = self._parse(path, source)
         if error is not None:
             raise DeckError(explain(path, source, error["message"], self._locate(path, source, error)))
@@ -115,7 +117,8 @@ class Checker:
             line, url = outside
             raise DeckError(
                 f"{path}:{line}: a diagram can't load or link to anything outside the deck ({url}); "
-                "use a data: URI for an image and a #anchor, such as #3 for slide 3, for a link"
+                "give an image as a file path in img: or a data: URI, and a link as a #anchor, such as "
+                "#3 for slide 3"
             )
 
     def _start(self, path: Path) -> None:
@@ -207,6 +210,23 @@ def _serve() -> None:
 def _send(message: dict[str, Any]) -> None:
     sys.stdout.write(json.dumps(message) + "\n")
     sys.stdout.flush()
+
+
+def _too_long(path: Path, size: int, limit: int, images: Sequence["Inlined"]) -> str:
+    if not images:
+        return (
+            f"{path}: the diagram is {size:,} characters long, over Mermaid's limit of {limit:,}; split it "
+            "into smaller diagrams"
+        )
+    used = sum(image.size for image in images)
+    each = ", ".join(
+        f"{image.name} (line {image.line}) {image.size:,}" for image in sorted(images, key=lambda i: -i.size)
+    )
+    return (
+        f"{path}: the diagram is {size:,} characters long with its images inlined, over Mermaid's limit "
+        f"of {limit:,}; the images use {used:,} of them: {each}. Crop or shrink an image with #crop= or "
+        "#max= after its path, or split the diagram"
+    )
 
 
 def _line_at(source: str, index: int) -> int:

@@ -17,6 +17,12 @@ All notable changes to this project are documented here. The format follows
 - `image-crop: left, top, right, bottom` on split and image slides keeps only that part of a
   PNG, JPEG or WebP image, in pixels, before it's shrunk to `image-max`. A crop past the image's
   edge stops the build and gives the image's size.
+- An image shape in a Mermaid diagram can name an image file: `img: "screenshot.png"`, relative
+  to the `.mmd` file. The build puts it into the diagram as a `data:` URI, so it no longer has
+  to be pasted in as base64. When the node sets `w` or `h`, the image is shrunk to twice that.
+  `#crop=` and `#max=` after the path crop or size it. A missing file stops the build with the
+  diagram's line, and a diagram that its images push over Mermaid's 50,000-character limit
+  stops with how much each image uses (#21).
 
 ### Changed
 

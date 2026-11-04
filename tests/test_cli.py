@@ -105,6 +105,28 @@ def test_image_frame_setting_reaches_the_page(tmp_path: Path):
     assert page.count(CSP) == 1
 
 
+def test_a_diagram_image_file_is_inlined_into_the_page(tmp_path: Path):
+    (tmp_path / "img").mkdir()
+    Image.new("RGB", (40, 20)).save(tmp_path / "img" / "shot.png")
+    (tmp_path / "img" / "flow.mmd").write_text('flowchart LR\n  a --> b@{ img: "shot.png", w: 40 }\n')
+    (tmp_path / "deck.md").write_text("images: img\n---\nlayout: image\nimage: flow.mmd\n")
+    page, _ = render.build(tmp_path / "deck.md")
+    assert '<pre class="diagram-src">flowchart LR\n  a --&gt; b@{ img: "data:image/png;base64,' in page
+    assert "shot.png" not in page
+
+
+def test_diagram_image_errors_name_the_slide_and_the_diagram_line(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    (tmp_path / "flow.mmd").write_text('flowchart LR\n  a --> b\n  b@{ img: "gone.png" }\n')
+    deck = tmp_path / "deck.md"
+    deck.write_text("---\n## One\n---\nlayout: image\nimage: flow.mmd\n")
+    assert main(["build", str(deck)]) == 1
+    assert capsys.readouterr().err == (
+        f"akceo: {deck}:4: slide 2: {tmp_path / 'flow.mmd'}:3: image not found: {tmp_path / 'gone.png'}\n"
+    )
+
+
 def test_image_crop_reaches_the_page(tmp_path: Path):
     Image.new("RGB", (400, 200)).save(tmp_path / "fig.png")
     (tmp_path / "deck.md").write_text("---\nlayout: image\nimage: fig.png\nimage-crop: 100, 50, 300, 150\n")

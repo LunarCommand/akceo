@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import json
+import random
 import re
 import sys
 import zlib
@@ -8,8 +9,10 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 from akceo import mermaid
+from akceo.diagram_images import inline
 from akceo.errors import DeckError
 from akceo.mermaid import Checker
 
@@ -173,7 +176,7 @@ OUTSIDE = [
 def test_diagrams_cant_load_or_link_outside_the_deck(checker: Checker, source: str, line: int, url: str):
     assert error(checker, source) == (
         f"flow.mmd:{line}: a diagram can't load or link to anything outside the deck ({url}); "
-        "use a data: URI for an image and a #anchor, such as #3 for slide 3, for a link"
+        "give an image as a file path in img: or a data: URI, and a link as a #anchor, such as #3 for slide 3"
     )
 
 
@@ -184,6 +187,34 @@ def test_a_diagram_too_long_for_mermaid_to_draw(checker: Checker):
     assert error(checker, source) == (
         f"flow.mmd: the diagram is {size:,} characters long, over Mermaid's limit of 50,000; "
         "split it into smaller diagrams"
+    )
+
+
+def test_inlined_images_pass_the_check(checker: Checker, tmp_path: Path):
+    Image.new("RGB", (40, 20)).save(tmp_path / "shot.png")
+    (tmp_path / "logo.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>')
+    source = (
+        'flowchart LR\n  a@{ img: "shot.png", label: "Shot", pos: "b", w: 40 }\n  a --> b@{ img: logo.svg }\n'
+    )
+    inlined_source, inlined = inline(tmp_path / "flow.mmd", source)
+    assert [image.name for image in inlined] == ["shot.png", "logo.svg"]
+    checker.check(FLOW, inlined_source, inlined)
+
+
+def test_a_diagram_too_long_with_its_images_inlined_names_them(checker: Checker, tmp_path: Path):
+    # Noise doesn't compress, so this PNG alone is past Mermaid's limit once it's base64.
+    Image.frombytes("RGB", (150, 150), random.Random(0).randbytes(150 * 150 * 3)).save(tmp_path / "noise.png")
+    Image.new("RGB", (40, 20)).save(tmp_path / "small.png")
+    source = 'flowchart LR\n  a@{ img: "small.png" }\n  a --> b@{ img: "noise.png" }\n'
+    inlined_source, inlined = inline(tmp_path / "flow.mmd", source)
+    small, noise = inlined
+    with pytest.raises(DeckError) as e:
+        checker.check(FLOW, inlined_source, inlined)
+    assert str(e.value) == (
+        f"flow.mmd: the diagram is {len(inlined_source):,} characters long with its images inlined, over "
+        f"Mermaid's limit of 50,000; the images use {small.size + noise.size:,} of them: noise.png (line 3) "
+        f"{noise.size:,}, small.png (line 2) {small.size:,}. Crop or shrink an image with #crop= or #max= "
+        "after its path, or split the diagram"
     )
 
 

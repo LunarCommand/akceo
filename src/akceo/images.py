@@ -14,10 +14,12 @@ MIME = {"PNG": "image/png", "JPEG": "image/jpeg", "WEBP": "image/webp"}
 SAVE_OPTIONS: dict[str, dict[str, Any]] = {"PNG": {}, "JPEG": {"quality": 90}, "WEBP": {"quality": 90}}
 
 
-def data_uri(path: Path, max_px: int, crop: tuple[int, int, int, int] | None = None) -> str:
+def data_uri(
+    path: Path, max_size: tuple[int, int] | None, crop: tuple[int, int, int, int] | None = None
+) -> str:
     """Embed an image. Raster formats are turned upright, cropped to crop (left, top, right, bottom)
-    if given, then shrunk so the longest side is at most max_px. SVG is embedded as-is. Mermaid .mmd
-    diagrams don't come here; the page draws them (see akceo.mermaid)."""
+    if given, then shrunk to fit max_size (width, height) if given, keeping their shape. SVG is
+    embedded as-is. Mermaid .mmd diagrams don't come here; the page draws them (see akceo.mermaid)."""
     if not files.is_file(path):
         raise DeckError(f"image not found: {path}")
     try:
@@ -34,7 +36,8 @@ def data_uri(path: Path, max_px: int, crop: tuple[int, int, int, int] | None = N
             image = ImageOps.exif_transpose(opened)
             if crop:
                 image = _crop(image, crop, path, opened.size)
-            image.thumbnail((max_px, max_px))
+            if max_size:
+                image.thumbnail(max_size)
             buf = io.BytesIO()
             image.save(buf, format=fmt, **SAVE_OPTIONS[fmt])
     except UnidentifiedImageError:
