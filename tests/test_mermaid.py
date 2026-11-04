@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import json
+import random
 import re
 import sys
 import zlib
@@ -8,10 +9,12 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 from akceo import mermaid
+from akceo.diagram_images import inline
 from akceo.errors import DeckError
-from akceo.mermaid import Checker
+from akceo.mermaid import Checker, NodeImage
 
 FLOW = Path("flow.mmd")
 
@@ -43,8 +46,13 @@ def error(checker: Checker, source: str) -> str:
         # Links to a slide, data: images and URLs that are only text keep the deck self-contained.
         'flowchart LR\n  a --> b\n  click a "#5" "Go to slide 5"\n',
         'flowchart LR\n  b@{ img: "data:image/png;base64,AAAA", label: "L" }\n',
+        'flowchart LR\n  b@{ img: "DATA:image/png;base64,AAAA" }\n',
         'flowchart LR\n  a["see https://example.com"] --> b\n',
         'flowchart LR\n  a["Docs, img: https://example.com/guide"] --> b\n',
+        'flowchart LR\n  b@{ label: "img: https://example.com/a.png", img: "data:image/png;base64,AA" }\n',
+        # Mermaid reads these as text, not as an image node.
+        'flowchart LR\n  a["see b@{ img: https://example.com/a.png }"] --> b\n',
+        "timeline\n  2024 : a node takes @{ img: https://example.com/a.png }\n",
         'flowchart LR\n  %% click a href "https://example.com"\n  a --> b\n',
         # A srcset of data: URIs only, whose own commas don't split it.
         "flowchart LR\n  a[\"<img srcset='data:image/png;base64,AAAA 1x, "
@@ -119,6 +127,20 @@ OUTSIDE = [
     ),
     ('flowchart LR\n  b@{ "img": "https://x.example/i.png", label: "L" }\n', 2, "https://x.example/i.png"),
     ('flowchart LR\n  b@{\n    label: "L"\n    img: "pic.png"\n  }\n', 4, "pic.png"),
+    # A quote left open in front matter doesn't hide the image's line.
+    (
+        '---\ntitle: He said "hi\n---\nflowchart LR\n  b@{ img: "https://x.example/i.png" }\n',
+        5,
+        "https://x.example/i.png",
+    ),
+    # Shape data is read as Mermaid reads it: a } in a quoted label doesn't end it, and a value can
+    # be unquoted or on the next line.
+    ('flowchart LR\n  b@{ label: "a } b", img: "https://x.example/i.png" }\n', 2, "https://x.example/i.png"),
+    ("flowchart LR\n  b@{\n    img:\n      https://x.example/p.png\n  }\n", 4, "https://x.example/p.png"),
+    # An apostrophe inside a plain label doesn't open a quote.
+    ("flowchart LR\n  b@{ label: It's me, img: 'https://x.example/q.png' }\n", 2, "https://x.example/q.png"),
+    # An img is never an anchor: the page would load it.
+    ('flowchart LR\n  b@{ img: "#top" }\n', 2, "#top"),
     # HTML in a label: src with a padded value, srcset, and a tag split over two lines.
     ("flowchart LR\n  a --> c[\"<img src=' https://x.example/l.png'/> L\"]\n", 2, "https://x.example/l.png"),
     ("flowchart LR\n  a --> c[\"<img srcset='https://x.example/s.png'> L\"]\n", 2, "https://x.example/s.png"),
@@ -168,8 +190,26 @@ OUTSIDE = [
 def test_diagrams_cant_load_or_link_outside_the_deck(checker: Checker, source: str, line: int, url: str):
     assert error(checker, source) == (
         f"flow.mmd:{line}: a diagram can't load or link to anything outside the deck ({url}); "
-        "use a data: URI for an image and a #anchor, such as #3 for slide 3, for a link"
+        "give an image as a file path in img: or a data: URI, and a link as a #anchor, such as #3 for slide 3"
     )
+
+
+def test_an_outside_image_akceo_cant_find_names_its_node(checker: Checker):
+    # Mermaid reads YAML's explicit key as img; the shape-data reader doesn't, so there's no line.
+    assert error(checker, "flowchart LR\n  a --> b\n  b@{ ? img : https://x.example/i.png }\n") == (
+        "flow.mmd: node b: a diagram can't load or link to anything outside the deck "
+        "(https://x.example/i.png); give an image as a file path in img: or a data: URI, and a link as "
+        "a #anchor, such as #3 for slide 3"
+    )
+
+
+def test_images_are_read_by_mermaid(checker: Checker):
+    source = 'flowchart LR\n  a@{ img: x.png, w: 1e2 }\n  b@{ img: "data:,", h: "60" }\n  c@{ w: 5 }\n'
+    assert checker.images(FLOW, source) == [
+        NodeImage("a", "x.png", 100, None),
+        NodeImage("b", "data:,", None, 60),
+    ]
+    assert checker.images(FLOW, "sequenceDiagram\n  A->>B: hi\n") == []
 
 
 def test_a_diagram_too_long_for_mermaid_to_draw(checker: Checker):
@@ -179,6 +219,34 @@ def test_a_diagram_too_long_for_mermaid_to_draw(checker: Checker):
     assert error(checker, source) == (
         f"flow.mmd: the diagram is {size:,} characters long, over Mermaid's limit of 50,000; "
         "split it into smaller diagrams"
+    )
+
+
+def test_inlined_images_pass_the_check(checker: Checker, tmp_path: Path):
+    Image.new("RGB", (40, 20)).save(tmp_path / "shot.png")
+    (tmp_path / "logo.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>')
+    source = (
+        'flowchart LR\n  a@{ img: "shot.png", label: "Shot", pos: "b", w: 40 }\n  a --> b@{ img: logo.svg }\n'
+    )
+    inlined_source, inlined = inline(tmp_path / "flow.mmd", source, checker.images(FLOW, source))
+    assert [image.name for image in inlined] == ["shot.png", "logo.svg"]
+    checker.check(FLOW, inlined_source, inlined)
+
+
+def test_a_diagram_too_long_with_its_images_inlined_names_them(checker: Checker, tmp_path: Path):
+    # Noise doesn't compress, so this PNG alone is past Mermaid's limit once it's base64.
+    Image.frombytes("RGB", (150, 150), random.Random(0).randbytes(150 * 150 * 3)).save(tmp_path / "noise.png")
+    Image.new("RGB", (40, 20)).save(tmp_path / "small.png")
+    source = 'flowchart LR\n  a@{ img: "small.png" }\n  a --> b@{ img: "noise.png" }\n'
+    inlined_source, inlined = inline(tmp_path / "flow.mmd", source, checker.images(FLOW, source))
+    small, noise = inlined
+    with pytest.raises(DeckError) as e:
+        checker.check(FLOW, inlined_source, inlined)
+    assert str(e.value) == (
+        f"flow.mmd: the diagram is {len(inlined_source):,} characters long with its images inlined, over "
+        f"Mermaid's limit of 50,000; the images use {small.size + noise.size:,} of them: noise.png (line 3) "
+        f"{noise.size:,}, small.png (line 2) {small.size:,}. Crop or shrink an image with #crop= or #max= "
+        "after its path, or split the diagram"
     )
 
 

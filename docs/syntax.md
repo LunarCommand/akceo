@@ -148,6 +148,7 @@ The `split` and `image` layouts embed their image in the page.
 - **SVG** is embedded unchanged.
 - **Mermaid** diagrams in a `.mmd` file are drawn as SVG by the page when it opens. akceo
   includes Mermaid, so nothing else needs installing. See [Mermaid diagrams](#mermaid-diagrams).
+  An image inside a diagram can be a file too; see [Images in diagrams](#images-in-diagrams).
 
 Other formats stop the build, and so does an image akceo can't process, such as one with
 damaged EXIF data.
@@ -173,14 +174,15 @@ akceo: deck.md:40: slide 6: flow.mmd:3: Parse error: Expecting 'PE', 'TAGEND', .
 `akceo check deck.md` runs the same checks without writing a file.
 
 A diagram can't load or link to anything outside the deck. Links may only point at a `#` anchor,
-such as `#5` for slide 5, and anything loaded must be a `data:` URI. A relative path counts as
-outside: it would point at a file next to `deck.html`, which is gone once the deck is copied. The
-build stops, naming the line, on:
+such as `#5` for slide 5. An image must be a file that the build puts into the diagram (see
+[Images in diagrams](#images-in-diagrams)) or a `data:` URI. Anything else loaded counts as
+outside, including a relative path in label HTML: it would point at a file next to `deck.html`,
+which is gone once the deck is copied. The build stops, naming the line, on:
 
 - links: `click` (including `href`), a class diagram's `link`, a sequence diagram's `link` and
   `links`, C4's `$link=`, and `<a href=…>` in a label.
-- images: an image shape's `img:` (`b@{ img: … }`) and `src`, `srcset` and similar attributes
-  in label HTML.
+- images: a URL in an image shape's `img:` (`b@{ img: … }`), and `src`, `srcset` and similar
+  attributes in label HTML.
 - CSS: `url(…)` and `@import`, whether in `themeCSS` in the front matter or an `%%{init}%%` line,
   or in a `style=` in a label. `url(#id)`, which points inside the diagram, is fine.
 
@@ -201,6 +203,57 @@ to the file. A deck without diagrams doesn't. The page unpacks Mermaid when it o
 and Mermaid itself together need Chrome or Edge 98, Firefox 113 or Safari 16.4, or newer. In an
 older browser, each diagram shows a message in its place. Mermaid's Font Awesome icons
 (`fa:fa-car`) don't show, because the page loads no outside stylesheets.
+
+#### Images in diagrams
+
+An image shape's `img:` can name an image file, relative to the `.mmd` file's folder. Write it
+the way Mermaid takes any value in shape data: in double or single quotes, or bare.
+
+```
+flowchart LR
+  a --> b@{ img: "screenshot.png", label: "The new form", w: 300, constraint: "on" }
+```
+
+The build reads the file and puts it into the diagram as a `data:` URI, the same way it embeds a
+slide's image: PNG, JPEG and WebP are turned upright and re-saved, and SVG goes in unchanged. A
+missing file stops the build with its path and the line in the `.mmd` file. A `data:` URI is
+used as it is.
+
+The build asks Mermaid which nodes have an image, so `@{ img: … }` inside a label is only text.
+It then finds each image in the `.mmd` file to replace it. An image Mermaid reads that akceo
+can't find there, such as one given through a YAML anchor, stops the build naming its node.
+Write it on one line, as above.
+
+Mermaid stretches an image to fill its node's box. The box takes the node's `w` and `h`, and the
+image's own size in pixels for a side the node doesn't set. With `constraint: "on"` and only `w`
+or `h`, Mermaid works out the other side from the image's shape instead. So to keep an image in
+proportion, set `w` with `constraint: "on"`, as above, or set both. A node with a label is at
+least 120 pixels wide.
+
+When the node sets `w` or `h`, the image is shrunk to twice that, which stays sharp on a
+high-density screen. When it sets neither, the image keeps its size. An image that several nodes
+use is sized for the largest.
+
+Two options after a `#` on the path change that. Join them with `&`, and quote a path that has
+any:
+
+| Option | Meaning |
+| --- | --- |
+| `crop=left,top,right,bottom` | Keep only part of the image, in pixels, as `image-crop` does for a slide's image. |
+| `max=pixels` | Shrink the image so its longest side is at most this many pixels, instead of fitting it to twice `w` and `h`. In a node without a label that sets neither, Mermaid draws it at this size. Not for SVG: set the node's `w` and `h` instead. |
+
+```
+flowchart LR
+  a --> b@{ img: "screenshot.png#crop=0,0,1200,800&max=600", w: 300, constraint: "on" }
+```
+
+A file whose name contains `#` can't be used, and neither can a path that's only options, such
+as `img: "#max=300"`.
+
+Each image counts toward Mermaid's 50,000-character limit on the diagram, at about four
+characters for every three bytes of the image, and an image used twice counts twice. Over the
+limit, the build stops and lists how much each image uses. Crop or shrink the largest, or split
+the diagram.
 
 ### Frames
 

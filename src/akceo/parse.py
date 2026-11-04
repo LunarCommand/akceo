@@ -266,9 +266,11 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
             raise fail(f"'{key}' only applies to the {_join(owners)} {noun}", line)
         if key in FLAG_KEYS and value not in ("yes", "no"):
             raise fail(f"'{key}' must be yes or no, not '{value}'", line)
-        if key == "image-max" and not (PIXELS.fullmatch(value) and int(value) > 0):
-            rule = "a positive whole number of pixels, at most nine digits 0-9"
-            raise fail(f"'image-max' must be {rule}, not '{value}'", line)
+        if key == "image-max":
+            try:
+                pixel_count(value, key)
+            except DeckError as e:
+                raise fail(str(e), line) from None
         if key == "image-crop":
             try:
                 crop_box(value, key)
@@ -296,6 +298,16 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
             raise fail(f"the {layout} layout needs {BLOCK_NAMES[kind]}")
 
     return Slide(number, first, meta, tuple(blocks))
+
+
+def pixel_count(value: str, key: str) -> int:
+    """A positive whole number of pixels. Anything else raises a DeckError naming key, the setting it
+    came from."""
+    if not (PIXELS.fullmatch(value) and int(value) > 0):
+        raise DeckError(
+            f"'{key}' must be a positive whole number of pixels, at most nine digits 0-9, not '{value}'"
+        )
+    return int(value)
 
 
 def crop_box(value: str, key: str) -> tuple[int, int, int, int]:

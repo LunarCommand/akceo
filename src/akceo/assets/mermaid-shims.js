@@ -57,17 +57,26 @@ globalThis.URL = class URL {
   }
 };
 
-// Resolves to null when the diagram parses, or to Mermaid's error as JSON. A YAML error from front
-// matter or @{...} shape data counts its line within that snippet, not within the file.
+// Resolves, as JSON, to Mermaid's error, or when the diagram parses to the img, w and h it read for
+// each flowchart node with an image. A YAML error from front matter or @{...} shape data counts its
+// line within that snippet, not within the file.
 globalThis.akceoCheck = async (source) => {
   try {
     await mermaid.parse(source);
-    return null;
+    const { db } = await mermaid.mermaidAPI.getDiagramFromText(source);
+    const nodes = db.getVertices ? [...db.getVertices().values()] : [];
+    return JSON.stringify({
+      images: nodes
+        .filter((node) => node.img)
+        .map((node) => ({ node: node.id, img: String(node.img), w: node.assetWidth, h: node.assetHeight })),
+    });
   } catch (e) {
     return JSON.stringify({
-      name: String((e && e.name) || "Error"),
-      message: String((e && e.message) || e),
-      yamlLine: e && e.mark && typeof e.mark.line === "number" ? e.mark.line : null,
+      error: {
+        name: String((e && e.name) || "Error"),
+        message: String((e && e.message) || e),
+        yamlLine: e && e.mark && typeof e.mark.line === "number" ? e.mark.line : null,
+      },
     });
   }
 };
