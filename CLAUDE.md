@@ -5,14 +5,16 @@ dependencies are Pillow (images) and mini-racer (V8, to check Mermaid diagrams a
 
 ## Layout
 
-- `src/akceo/parse.py`: the Markdown dialect into a validated `Deck`. All input checks live here.
+- `src/akceo/parse.py`: the Markdown dialect into a validated `Deck`. All input checks live here,
+  except those that need the image itself, such as a crop past its edge, which `images.py` makes.
 - `src/akceo/render.py`: slides to HTML, inline markup, page assembly.
-- `src/akceo/images.py`: image files to data URIs.
+- `src/akceo/images.py`: image files to data URIs, cropped and shrunk.
 - `src/akceo/mermaid.py`: the build-time diagram check (V8 in a child process it runs as
   `python -m akceo.mermaid`), the theme's Mermaid config, and the vendored Mermaid script, packed
   for the page, with its license notices.
 - `src/akceo/themes.py`: theme lookup and the token check.
-- `src/akceo/files.py`: reads user-supplied text files, turning read failures into `DeckError`.
+- `src/akceo/files.py`: checks for and reads user-supplied files, turning read failures into
+  `DeckError`.
 - `src/akceo/cli.py`: the `akceo` command.
 - `src/akceo/assets/`: the page template, `base.css` (layout rules; all colors and fonts come from
   theme tokens), `deck.js` (navigation), `diagrams.js` (unpacks Mermaid and draws the diagrams),

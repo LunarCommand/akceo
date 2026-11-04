@@ -15,10 +15,10 @@ COMMON_KEYS = ("layout", "kicker", *STYLE_KEYS)
 LAYOUT_KEYS: dict[str, tuple[str, ...]] = {
     "title": ("meta",),
     "bullets": (),
-    "split": ("image", "image-alt", "image-max", "image-wide", "image-frame"),
+    "split": ("image", "image-alt", "image-max", "image-crop", "image-wide", "image-frame"),
     "steps": (),
     "table": ("dim-last-column",),
-    "image": ("image", "image-alt", "image-max", "image-frame"),
+    "image": ("image", "image-alt", "image-max", "image-crop", "image-frame"),
 }
 FLAG_KEYS = ("image-wide", "dim-last-column", "image-frame")
 
@@ -65,6 +65,10 @@ CODE_SPAN = re.compile(r"`[^`]+`")
 LINK = re.compile(r"\[([^\]\n]+)\]\(([^)\n]*)\)")
 OUTSIDE_LINK = re.compile(r"(https?://|mailto:)[^\s\"'<>`\x01]+", re.IGNORECASE)  # \x01 is BREAK
 SLIDE_LINK = re.compile(r"#([0-9]+)")  # ASCII digits only, as deck.js reads the hash
+# Pixel counts take at most nine ASCII digits. str.isdigit() also passes digits such as "²", which
+# int() rejects, and int() refuses a string past its digit limit.
+PIXELS = re.compile(r"[0-9]{1,9}")
+CROP = re.compile(r"([0-9]{1,9})" + r"(?:\s*,\s*|\s+)([0-9]{1,9})" * 3)
 # C0 control characters, apart from tab, line feed, form feed and carriage return. The renderer
 # uses some as placeholders, and none of them belongs on a slide.
 CONTROL = re.compile(r"[\x00-\x08\x0b\x0e-\x1f]")
@@ -183,7 +187,7 @@ def _check_links(path: Path, slide: Slide, count: int) -> None:
                 message = f"a link's URL can't continue onto the next line ('{written.replace(BREAK, '\\')}')"
                 raise _error(path, slide.line, f"slide {slide.number}: {message}")
             slide_link = SLIDE_LINK.fullmatch(url)
-            if slide_link and not 1 <= int(slide_link.group(1)) <= count:
+            if slide_link and not _names_a_slide(slide_link.group(1), count):
                 message = f"the link to {url} goes past the last slide, {count}"
                 raise _error(path, slide.line, f"slide {slide.number}: {message}")
             if not slide_link and not OUTSIDE_LINK.fullmatch(url):
@@ -193,6 +197,14 @@ def _check_links(path: Path, slide: Slide, count: int) -> None:
                     f"slide {slide.number}: can't link to '{written}'; a link goes to an https:, http: or "
                     "mailto: address, or to a slide as #N",
                 )
+
+
+def _names_a_slide(digits: str, count: int) -> bool:
+    """Whether #digits opens one of count slides. deck.js reads the hash with parseInt, so leading
+    zeros don't change the slide. The length check keeps int() inside its digit limit; no deck has
+    a billion slides."""
+    significant = digits.lstrip("0") or "0"
+    return len(significant) <= 9 and 1 <= int(significant) <= count
 
 
 def _error(path: Path, line: int, message: str) -> DeckError:
@@ -254,8 +266,17 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
             raise fail(f"'{key}' only applies to the {_join(owners)} {noun}", line)
         if key in FLAG_KEYS and value not in ("yes", "no"):
             raise fail(f"'{key}' must be yes or no, not '{value}'", line)
-        if key == "image-max" and not (value.isdigit() and int(value) > 0):
-            raise fail(f"'image-max' must be a positive whole number of pixels, not '{value}'", line)
+        if key == "image-max" and not (PIXELS.fullmatch(value) and int(value) > 0):
+            rule = "a positive whole number of pixels, at most nine digits 0-9"
+            raise fail(f"'image-max' must be {rule}, not '{value}'", line)
+        if key == "image-crop":
+            try:
+                crop_box(value, key)
+            except DeckError as e:
+                raise fail(str(e), line) from None
+            image = meta.get("image", "")
+            if image.lower().endswith((".svg", ".mmd")):
+                raise fail(f"'image-crop' only works on PNG, JPEG and WebP images, not {image}", line)
         if key in STYLE_KEYS and STYLE_URL.search(value):
             raise fail(f"'{key}' can't reference files or URLs (url() or image-set())", line)
 
@@ -275,6 +296,21 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
             raise fail(f"the {layout} layout needs {BLOCK_NAMES[kind]}")
 
     return Slide(number, first, meta, tuple(blocks))
+
+
+def crop_box(value: str, key: str) -> tuple[int, int, int, int]:
+    """A crop value as (left, top, right, bottom). A value that isn't four whole numbers, or that
+    keeps nothing, raises a DeckError naming key, the setting it came from."""
+    m = CROP.fullmatch(value.strip())
+    if not m:
+        raise DeckError(
+            f"'{key}' must be four whole numbers of pixels, left, top, right and bottom, each at most nine "
+            f"digits 0-9, such as 120, 80, 920, 580, not '{value}'"
+        )
+    left, top, right, bottom = map(int, m.groups())
+    if right <= left or bottom <= top:
+        raise DeckError(f"'{key}' {value} is empty: right must be past left, and bottom below top")
+    return left, top, right, bottom
 
 
 def _join(names: list[str]) -> str:

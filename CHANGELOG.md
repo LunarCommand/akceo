@@ -14,6 +14,14 @@ All notable changes to this project are documented here. The format follows
 - Three theme tokens style links: `--link`, `--link-hover` and `--link-underline`. Both built-in
   themes set them. A custom theme needs them only for a deck that has links; without them, that
   deck's build stops and names the missing ones.
+- `image-crop: left, top, right, bottom` on split and image slides keeps only that part of a
+  PNG, JPEG or WebP image, in pixels, before it's shrunk to `image-max`. A crop past the image's
+  edge stops the build and gives the image's size.
+
+### Changed
+
+- `image-max` takes a whole number of at most nine digits 0-9. Other digits, such as full-width
+  ones, and longer numbers used to be accepted and now stop the build.
 
 ### Fixed
 
@@ -21,6 +29,13 @@ All notable changes to this project are documented here. The format follows
   used to crash with a Python traceback, or put invisible characters on the slide.
 - Ctrl-C during a command prints `akceo: interrupted` and exits with code 130, instead of
   a Python traceback.
+- An `image-max` with a digit outside ASCII, such as `8²`, or with thousands of digits, stops
+  the build with a message. It used to crash with a Python traceback.
+- An image that Pillow can't process stops the build with a message naming it, such as a PNG or
+  WebP with damaged EXIF data, a 16-bit grayscale PNG shrunk four times or more, or a file that
+  declares a huge size. These used to crash with a Python traceback.
+- An image or diagram whose file name is too long for the system is reported as not found. It
+  used to crash with a Python traceback.
 
 ## [0.2.1] - 2026-10-30
 
