@@ -30,10 +30,33 @@ text, with no error; the recipes below list what to avoid.
 | Command | Does |
 | --- | --- |
 | `akceo check deck.md` | Runs every check, diagrams included, and writes nothing |
+| `akceo check --json deck.md` | The same, with the result as JSON |
 | `akceo build deck.md` | Writes `deck.html`. `-o` names another file, and `--theme` overrides the deck's theme |
 | `akceo themes` | Lists the built-in themes |
 | `akceo docs` | Prints where this guide is. `--print` prints the guide itself |
 | `akceo init` | Adds a section to `AGENTS.md` and `CLAUDE.md` in a folder that points agents to this guide |
+
+`akceo check --json` prints one JSON object, and exits 0 when `ok` is true and 1 when it isn't:
+
+| Field | Holds |
+| --- | --- |
+| `ok` | `true` when akceo found nothing wrong |
+| `deck` | The deck's path, as given |
+| `slides` | The number of slides, or `null` when there's an error |
+| `errors` | The problem found, or an empty list. Checking stops at the first problem, so there's one at most |
+
+Each error has:
+
+| Field | Holds |
+| --- | --- |
+| `code` | The kind of problem, such as `block-missing`; the Error codes section lists them all |
+| `message` | What's wrong, without the file and line |
+| `file`, `line`, `slide` | Where the problem is, usually in the deck. Each is `null` when it doesn't apply |
+| `in` | The file and line inside another file the slide uses, such as its diagram, or `null` |
+| `text` | The line `akceo check` prints |
+
+Fields may be added later, but none is renamed or removed. A mistake in the command itself, such
+as an unknown option, exits 2 and prints how to use the command, not JSON.
 
 ## Deck syntax
 
@@ -367,6 +390,56 @@ A comment on a theme's first line is its description in `akceo themes`. The page
 Content-Security-Policy stops it loading anything from outside, so a web font or an `@import` in a
 theme never shows. Use fonts installed on the machine you present from, or embed one as a
 `data:` URI in an `@font-face` rule.
+
+### Error codes
+
+`akceo check` stops at the first problem and names its file, line and slide. Each problem also
+has a code, which `akceo check --json` reports, so an agent can act on the kind of problem without
+reading the message. A code is never renamed or reused.
+
+| Code | Raised when |
+| --- | --- |
+| `file-not-found` | The deck, a theme, an image, the icon or a diagram doesn't exist |
+| `file-unreadable` | A file exists but can't be read, such as when permission is denied |
+| `file-not-utf8` | The deck, a theme or a diagram isn't UTF-8 text |
+| `file-unwritable` | The built page, the viewer or a file `akceo init` writes can't be written |
+| `deck-control-character` | The deck has a control character in it |
+| `deck-no-slides` | The deck has no slides |
+| `config-not-key-value` | A line in the config block isn't `key: value` |
+| `key-unknown` | A config key or slide key akceo doesn't know |
+| `layout-unknown` | A `layout:` that isn't one of the six |
+| `key-wrong-layout` | A slide key that only works with other layouts |
+| `value-not-yes-or-no` | A yes-or-no key with another value |
+| `value-not-pixels` | `image-max`, or `max=` in a diagram's `img:`, isn't a positive whole number |
+| `crop-invalid` | `image-crop`, or `crop=` in a diagram's `img:`, isn't four whole numbers |
+| `crop-empty` | A crop that keeps nothing |
+| `crop-past-edge` | A crop past the image's edge |
+| `image-option-unsupported` | A crop or `max=` on an SVG image, or `image-crop` on a diagram |
+| `url-invalid` | `url:` isn't a full `https://` or `http://` address |
+| `style-url` | A `style-…` key uses `url()` or `image-set()` |
+| `block-not-in-layout` | Content the slide's layout doesn't take |
+| `block-repeated` | A second block of a kind the layout takes only once |
+| `block-missing` | A block the layout needs, such as the `##` heading |
+| `link-split` | A link's URL runs onto the next line |
+| `link-past-last-slide` | A `#N` link past the last slide |
+| `link-target-invalid` | A link that isn't to `https:`, `http:`, `mailto:` or `#N` |
+| `image-format-unsupported` | An image that isn't PNG, JPEG, WebP or SVG, such as a GIF |
+| `image-damaged` | An image file that can't be decoded |
+| `image-too-large` | An image over Pillow's size limit, about 179 million pixels; shrink it |
+| `diagram-syntax` | Mermaid can't parse the diagram |
+| `diagram-too-long` | A diagram over Mermaid's size limit |
+| `diagram-loads-outside` | A diagram that loads or links to anything outside the deck |
+| `diagram-timeout` | Mermaid took too long to check the diagram |
+| `img-unlocated` | akceo can't tell where a node's `img:` is written in the diagram |
+| `img-no-path` | An `img:` that starts with `#` |
+| `img-unquoted` | An `img:` with options that isn't in quotes |
+| `img-option-invalid` | An `img:` option that's unknown or given twice |
+| `theme-unknown` | A theme name that isn't built in |
+| `theme-closes-style` | A theme with `</style` in it |
+| `theme-missing-tokens` | A theme that leaves out a token it needs, including the link tokens for a deck with links |
+| `init-not-folder` | `akceo init` was given something that isn't a folder |
+| `init-link-outside` | `AGENTS.md` or `CLAUDE.md` links to a file outside the folder |
+| `init-broken-link` | `AGENTS.md` or `CLAUDE.md` links to a file that doesn't exist |
 
 ## Deck recipes
 

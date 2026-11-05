@@ -122,17 +122,21 @@ class Checker:
         are the image files put into source, which the too-long error names."""
         images = self._read(path, source, inlined)
         outside = outside_reference(source)
+        node = ""
         if outside:
-            where, url = f"{path}:{outside[0]}", outside[1]
+            line, url = outside
         else:
             image = next((i for i in images if not i.img.strip().lower().startswith("data:")), None)
             if image is None:
                 return
-            line = image_line(source, image.img)
-            where, url = f"{path}:{line}" if line else f"{path}: node {image.node}", image.img.strip()
+            line, url = image_line(source, image.img), image.img.strip()
+            node = "" if line else f"node {image.node}: "
         raise DeckError(
-            f"{where}: a diagram can't load or link to anything outside the deck ({url}); give an image "
-            "as a file path in img: or a data: URI, and a link as a #anchor, such as #3 for slide 3"
+            "diagram-loads-outside",
+            f"{node}a diagram can't load or link to anything outside the deck ({url}); give an image as a "
+            "file path in img: or a data: URI, and a link as a #anchor, such as #3 for slide 3",
+            path,
+            line,
         )
 
     def _read(self, path: Path, source: str, inlined: Sequence["Inlined"]) -> list[NodeImage]:
@@ -141,11 +145,11 @@ class Checker:
         # where the HTML parser has already turned \r\n into \n.
         size = len(source.replace("\r\n", "\n").encode("utf-16-le")) // 2
         if size > self._max_text_size:
-            raise DeckError(_too_long(path, size, self._max_text_size, inlined))
+            raise _too_long(path, size, self._max_text_size, inlined)
         answer = self._parse(path, source)
         if "error" in answer:
             error = answer["error"]
-            raise DeckError(explain(path, source, error["message"], self._locate(path, source, error)))
+            raise explain(path, source, error["message"], self._locate(path, source, error))
         return [NodeImage(i["node"], i["img"], i.get("w"), i.get("h")) for i in answer["images"]]
 
     def _start(self, path: Path) -> None:
@@ -177,7 +181,7 @@ class Checker:
             line = self._answers.get(timeout=timeout)
         except queue.Empty:
             self.close()
-            raise DeckError(f"{path}: Mermaid took over {timeout}s to {task}") from None
+            raise DeckError("diagram-timeout", f"Mermaid took over {timeout}s to {task}", path) from None
         if line is None:
             self.close()
             raise RuntimeError("the Mermaid checker process stopped unexpectedly")
@@ -241,21 +245,23 @@ def _send(message: dict[str, Any]) -> None:
     sys.stdout.flush()
 
 
-def _too_long(path: Path, size: int, limit: int, images: Sequence["Inlined"]) -> str:
+def _too_long(path: Path, size: int, limit: int, images: Sequence["Inlined"]) -> DeckError:
     if not images:
-        return (
-            f"{path}: the diagram is {size:,} characters long, over Mermaid's limit of {limit:,}; split it "
-            "into smaller diagrams"
+        message = (
+            f"the diagram is {size:,} characters long, over Mermaid's limit of {limit:,}; split it into "
+            "smaller diagrams"
         )
+        return DeckError("diagram-too-long", message, path)
     used = sum(image.size for image in images)
     each = ", ".join(
         f"{image.name} (line {image.line}) {image.size:,}" for image in sorted(images, key=lambda i: -i.size)
     )
-    return (
-        f"{path}: the diagram is {size:,} characters long with its images inlined, over Mermaid's limit "
-        f"of {limit:,}; the images use {used:,} of them: {each}. Crop or shrink an image with #crop= or "
+    message = (
+        f"the diagram is {size:,} characters long with its images inlined, over Mermaid's limit of "
+        f"{limit:,}; the images use {used:,} of them: {each}. Crop or shrink an image with #crop= or "
         "#max= after its path, or split the diagram"
     )
+    return DeckError("diagram-too-long", message, path)
 
 
 def _line_at(source: str, index: int) -> int:
@@ -346,29 +352,31 @@ def _srcset_urls(value: str) -> list[tuple[int, str]]:
     return urls
 
 
-def explain(path: Path, source: str, message: str, line: int | None = None) -> str:
+def explain(path: Path, source: str, message: str, line: int | None = None) -> DeckError:
     """Turn a Mermaid parse error into one line that points at the line in the diagram file. A line
     found some other way is used as is, with any YAML (line:column), which counts within a snippet,
     dropped from the message."""
     if line is not None:
         first = YAML_POSITION.sub("", message.strip().splitlines()[0])
-        return f"{path}:{line}: {first}"
+        return DeckError("diagram-syntax", first, path, line)
     origin = _origin_lines(source)
     if message.startswith(UNKNOWN_TYPE):
         # Mermaid reads the type from the first line it parses.
         hint = "start with one such as flowchart"
-        return f"{path}:{origin(1)}: Mermaid doesn't recognise the diagram type; {hint}"
+        return DeckError(
+            "diagram-syntax", f"Mermaid doesn't recognise the diagram type; {hint}", path, origin(1)
+        )
     jison = JISON_ERROR.match(message)
     if jison:
         kind, number, rest = jison.groups()
         # Mermaid shows the failing text and a caret under it; on one line the caret points nowhere.
         detail = [part for part in rest.splitlines() if part and not part.startswith(("...", "-"))]
         detail_text = " ".join(detail) or "the diagram is incomplete"
-        return f"{path}:{origin(int(number))}: {kind} error: {detail_text}"
+        return DeckError("diagram-syntax", f"{kind} error: {detail_text}", path, origin(int(number)))
     message = " ".join(message.removeprefix("Parsing failed:").split())
     lines = LINE_REF.findall(message)
     message = LINE_REF.sub(lambda m: f"line {origin(int(m.group(1)))}", message)
-    return f"{path}:{origin(int(lines[0]))}: {message}" if lines else f"{path}: {message}"
+    return DeckError("diagram-syntax", message, path, origin(int(lines[0])) if lines else None)
 
 
 def _origin_lines(source: str) -> Callable[[int], int]:

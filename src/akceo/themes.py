@@ -44,18 +44,24 @@ def load(spec: str, base: Path) -> str:
     if spec.endswith(".css") or "/" in spec or "\\" in spec:
         path = base / Path(spec).expanduser()
         if not path.is_file():
-            raise DeckError(f"theme file not found: {path}")
+            raise DeckError("file-not-found", f"theme file not found: {path}")
         css, label = files.read_text(path, "theme"), str(path)
     else:
         entry = BUILTIN / f"{spec}.css"
         if not entry.is_file():
-            raise DeckError(f"unknown theme '{spec}' (built-in themes: {', '.join(builtin())})")
+            raise DeckError(
+                "theme-unknown", f"unknown theme '{spec}' (built-in themes: {', '.join(builtin())})"
+            )
         css, label = entry.read_text(encoding="utf-8"), spec
     if re.search(r"</style", css, re.IGNORECASE):
-        raise DeckError(f"theme {label} contains '</style', which would end the page's style block")
+        raise DeckError(
+            "theme-closes-style", f"theme {label} contains '</style', which would end the page's style block"
+        )
     unset = missing(css, TOKENS)
     if unset:
-        raise DeckError(f"theme {label} doesn't set: {', '.join('--' + t for t in unset)}")
+        raise DeckError(
+            "theme-missing-tokens", f"theme {label} doesn't set: {', '.join('--' + t for t in unset)}"
+        )
     return css
 
 

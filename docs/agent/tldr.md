@@ -26,7 +26,30 @@ text, with no error; the recipes below list what to avoid.
 | Command | Does |
 | --- | --- |
 | `akceo check deck.md` | Runs every check, diagrams included, and writes nothing |
+| `akceo check --json deck.md` | The same, with the result as JSON |
 | `akceo build deck.md` | Writes `deck.html`. `-o` names another file, and `--theme` overrides the deck's theme |
 | `akceo themes` | Lists the built-in themes |
 | `akceo docs` | Prints where this guide is. `--print` prints the guide itself |
 | `akceo init` | Adds a section to `AGENTS.md` and `CLAUDE.md` in a folder that points agents to this guide |
+
+`akceo check --json` prints one JSON object, and exits 0 when `ok` is true and 1 when it isn't:
+
+| Field | Holds |
+| --- | --- |
+| `ok` | `true` when akceo found nothing wrong |
+| `deck` | The deck's path, as given |
+| `slides` | The number of slides, or `null` when there's an error |
+| `errors` | The problem found, or an empty list. Checking stops at the first problem, so there's one at most |
+
+Each error has:
+
+| Field | Holds |
+| --- | --- |
+| `code` | The kind of problem, such as `block-missing`; the Error codes section lists them all |
+| `message` | What's wrong, without the file and line |
+| `file`, `line`, `slide` | Where the problem is, usually in the deck. Each is `null` when it doesn't apply |
+| `in` | The file and line inside another file the slide uses, such as its diagram, or `null` |
+| `text` | The line `akceo check` prints |
+
+Fields may be added later, but none is renamed or removed. A mistake in the command itself, such
+as an unknown option, exits 2 and prints how to use the command, not JSON.

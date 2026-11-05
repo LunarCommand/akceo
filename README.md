@@ -64,6 +64,7 @@ Build it:
 akceo build deck.md          # writes deck.html next to deck.md
 akceo build deck.md -o talk.html --theme paper
 akceo check deck.md          # runs every check, diagrams included, and writes nothing
+akceo check --json deck.md   # the same, with the result as JSON for agents and scripts
 ```
 
 Open `deck.html` in a browser to present:

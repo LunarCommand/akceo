@@ -49,8 +49,10 @@ def inline(path: Path, source: str, nodes: Sequence[NodeImage]) -> tuple[str, li
     for value, using in by_value.items():
         if not any(entry.value == value for entry in found):
             raise DeckError(
-                f"{path}: akceo can't tell where node {using[0].node}'s img: {value.strip()} is written, "
-                f'to put the file in; write it on one line, such as img: "{value.strip()}"'
+                "img-unlocated",
+                f"akceo can't tell where node {using[0].node}'s img: {value.strip()} is written, "
+                f'to put the file in; write it on one line, such as img: "{value.strip()}"',
+                path,
             )
     edits: list[tuple[int, int, str]] = []
     inlined: list[Inlined] = []
@@ -59,10 +61,14 @@ def inline(path: Path, source: str, nodes: Sequence[NodeImage]) -> tuple[str, li
         line = source.count("\n", 0, entry.start) + 1
         if value.startswith("#"):
             example = f'img: "shot.png{value}"'
-            raise DeckError(f"{path}:{line}: an img: needs a file path before its #, such as {example}")
+            raise DeckError(
+                "img-no-path", f"an img: needs a file path before its #, such as {example}", path, line
+            )
         if entry.plain and "#" in value:
             example = f'img: "{value.partition("#")[0]}#crop=120,80,920,580"'
-            raise DeckError(f"{path}:{line}: quote an img: path that has options, such as {example}")
+            raise DeckError(
+                "img-unquoted", f"quote an img: path that has options, such as {example}", path, line
+            )
         name, uri = _encode(path, value, _box(by_value[entry.value]), line)
         edits.append((entry.start, entry.end, f'"{uri}"' + "\n" * source.count("\n", entry.start, entry.end)))
         inlined.append(Inlined(name, line, len(uri)))
@@ -91,13 +97,14 @@ def _encode(path: Path, value: str, box: tuple[int, int] | None, line: int) -> t
         crop, max_px = _options(options) if mark else (None, None)
         if max_px:
             if name.lower().endswith(".svg"):
-                raise DeckError(
+                message = (
                     f"max= can't shrink an SVG image, so set the node's w and h instead: {path.parent / name}"
                 )
+                raise DeckError("image-option-unsupported", message)
             box = (max_px, max_px)
         return name, images.data_uri(path.parent / name, box, crop)
     except DeckError as e:
-        raise DeckError(f"{path}:{line}: {e}") from None
+        raise e.within(path, line) from None
 
 
 def _options(text: str) -> tuple[tuple[int, int, int, int] | None, int | None]:
@@ -108,11 +115,12 @@ def _options(text: str) -> tuple[tuple[int, int, int, int] | None, int | None]:
         key, equals, value = option.partition("=")
         if key not in OPTIONS or not equals:
             raise DeckError(
+                "img-option-invalid",
                 f"an img: path takes crop= and max= after its #, joined with &, not '{option}' "
-                "(a file name can't contain #)"
+                "(a file name can't contain #)",
             )
         if key in seen:
-            raise DeckError(f"an img: path takes {key}= only once")
+            raise DeckError("img-option-invalid", f"an img: path takes {key}= only once")
         seen.add(key)
         if key == "crop":
             crop = parse.crop_box(value, "crop")
