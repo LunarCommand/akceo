@@ -62,9 +62,11 @@ kicker: Agenda
 - Second thing
 ```
 
-Mistakes stop the build with a message that names the file, the slide and a line: the key's
-own line when a key is wrong, or else the line where the slide starts. Examples are an unknown
-key, a key on the wrong layout, a missing heading, or content the layout doesn't use.
+Mistakes stop the build with a message that names the file, the slide and a line. The line is
+the key's own when a key is wrong, and the block's first line when a block, or a link in it, is
+wrong. A problem with the slide as a whole, such as a missing heading or image, names the line
+the slide starts on. Examples are an unknown key, a key on the wrong layout, a missing heading,
+or content the layout doesn't use.
 
 ### Config block
 

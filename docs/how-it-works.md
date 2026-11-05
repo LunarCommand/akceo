@@ -282,7 +282,7 @@ flowchart LR
     chunks --> slides["Each other chunk:<br/>a slide"]
     slides --> header["Header lines<br/>key: value"]
     slides --> body["Body lines"]
-    body --> logical["Drop // notes, then join continuations<br/>(2-space indent, trailing \)"]
+    body --> logical["Drop // notes, then join continuations<br/>(2-space indent, trailing \),<br/>keeping each line's number"]
     logical --> blocks["Group into blocks<br/>h1 h2 phase ul ol lead table note para"]
     header --> check{"Validate against<br/>the layout's contract"}
     blocks --> check
@@ -324,6 +324,7 @@ classDiagram
         body: str
         items: tuple
         rows: tuple
+        line: int
     }
     Deck "1" --> "many" Slide
     Slide "1" --> "many" Block
