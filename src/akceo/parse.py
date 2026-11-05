@@ -1,7 +1,7 @@
 """Parse akceo's Markdown dialect into a validated deck. The format is described in docs/syntax.md."""
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from akceo import files
@@ -81,6 +81,7 @@ class Block:
     body: str = ""
     items: tuple[str, ...] = ()
     rows: tuple[tuple[str, ...], ...] = ()
+    line: int = field(default=0, compare=False)  # where the block starts in the deck file
 
 
 @dataclass(frozen=True)
@@ -119,7 +120,8 @@ class Deck:
         return _error(self.path, slide.line, f"slide {slide.number}: {message}")
 
     def has_links(self) -> bool:
-        return any(LINK.search(_without_code(text)) for slide in self.slides for text in _slide_texts(slide))
+        texts = (text for slide in self.slides for _, text in _slide_texts(slide))
+        return any(LINK.search(_without_code(text)) for text in texts)
 
 
 Entry = tuple[int, str, str]  # (line number, key, value)
@@ -162,10 +164,13 @@ def parse(text: str, path: Path) -> Deck:
     return Deck(path, config, tuple(slides))
 
 
-def _slide_texts(slide: Slide) -> list[str]:
-    texts = [slide.meta.get("kicker", ""), slide.meta.get("meta", "")]
+def _slide_texts(slide: Slide) -> list[tuple[int, str]]:
+    """Each text the slide shows, with the line it's on: a block's first line, or the slide's for
+    the kicker and meta keys."""
+    texts = [(slide.line, slide.meta.get("kicker", "")), (slide.line, slide.meta.get("meta", ""))]
     for block in slide.blocks:
-        texts += [block.text, block.body, *block.items, *(cell for row in block.rows for cell in row)]
+        cells = (cell for row in block.rows for cell in row)
+        texts += [(block.line, text) for text in (block.text, block.body, *block.items, *cells)]
     return texts
 
 
@@ -179,21 +184,21 @@ def _without_code(text: str) -> str:
 def _check_links(path: Path, slide: Slide, count: int) -> None:
     """Every [text](url) must go to the web, to an email address, or to a slide in this deck. A
     link inside a code span is code, not a link."""
-    for text in _slide_texts(slide):
+    for line, text in _slide_texts(slide):
         for m in LINK.finditer(_without_code(text)):
             url = m.group(2)
             written = text[m.start(2) : m.end(2)]
             if BREAK in url:
                 message = f"a link's URL can't continue onto the next line ('{written.replace(BREAK, '\\')}')"
-                raise _error(path, slide.line, f"slide {slide.number}: {message}")
+                raise _error(path, line, f"slide {slide.number}: {message}")
             slide_link = SLIDE_LINK.fullmatch(url)
             if slide_link and not _names_a_slide(slide_link.group(1), count):
                 message = f"the link to {url} goes past the last slide, {count}"
-                raise _error(path, slide.line, f"slide {slide.number}: {message}")
+                raise _error(path, line, f"slide {slide.number}: {message}")
             if not slide_link and not OUTSIDE_LINK.fullmatch(url):
                 raise _error(
                     path,
-                    slide.line,
+                    line,
                     f"slide {slide.number}: can't link to '{written}'; a link goes to an https:, http: or "
                     "mailto: address, or to a slide as #N",
                 )
@@ -282,16 +287,16 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
         if key in STYLE_KEYS and STYLE_URL.search(value):
             raise fail(f"'{key}' can't reference files or URLs (url() or image-set())", line)
 
-    blocks = _blocks(_logical_lines(body))
+    blocks = _blocks(*_logical_lines(body, start + len(lines) - len(body)))
     allowed = LAYOUT_BLOCKS[layout]
     seen: set[str] = set()
     for block in blocks:
         name = BLOCK_NAMES[block.kind]
         if block.kind not in allowed:
             takes = _join([BLOCK_NAMES[kind] for kind in allowed]) if allowed else "no content"
-            raise fail(f"{name} isn't used by the {layout} layout, which takes {takes}")
+            raise fail(f"{name} isn't used by the {layout} layout, which takes {takes}", block.line)
         if block.kind in seen and not allowed[block.kind]:
-            raise fail(f"the {layout} layout takes only one {name.split(' ', 1)[1]}")
+            raise fail(f"the {layout} layout takes only one {name.split(' ', 1)[1]}", block.line)
         seen.add(block.kind)
     for kind in REQUIRED_BLOCKS[layout]:
         if kind not in seen:
@@ -330,24 +335,28 @@ def _join(names: list[str]) -> str:
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
 
-def _logical_lines(lines: list[str]) -> list[str]:
+def _logical_lines(lines: list[str], start: int) -> tuple[list[str], list[int]]:
     """Fold continuations into one line each: a trailing backslash joins the next line as a hard break,
     a two-space indent joins it as flowing text. Author notes are dropped first, so they never join
-    or split anything."""
+    or split anything. Returns the folded lines and, for each, the file line it starts on; start is
+    the file line of lines[0]."""
     out: list[str] = []
-    for line in lines:
+    numbers: list[int] = []
+    for number, line in enumerate(lines, start):
         stripped = line.rstrip()
         if _is_author_note(line):
             continue
         if not stripped.strip():
             out.append("")
+            numbers.append(number)
         elif out and out[-1].endswith("\\"):
             out[-1] = out[-1][:-1] + BREAK + stripped.strip()
         elif stripped.startswith("  ") and out and out[-1]:
             out[-1] = out[-1] + " " + stripped.strip()
         else:
             out.append(stripped)
-    return out
+            numbers.append(number)
+    return out, numbers
 
 
 def _take(lines: list[str], i: int, pattern: re.Pattern[str]) -> tuple[list[str], int]:
@@ -399,11 +408,12 @@ def _is_note(line: str) -> bool:
     return line.startswith("*") and line.endswith("*") and not line.startswith("**")
 
 
-def _blocks(lines: list[str]) -> list[Block]:
+def _blocks(lines: list[str], numbers: list[int]) -> list[Block]:
+    """The blocks in lines, each with the file line it starts on, from numbers."""
     out: list[Block] = []
     i = 0
     while i < len(lines):
-        line = lines[i]
+        line, number = lines[i], numbers[i]
         if not line.strip():
             i += 1
         elif line.startswith("### "):
@@ -417,27 +427,27 @@ def _blocks(lines: list[str]) -> list[Block]:
             ):
                 body = lines[i]
                 i += 1
-            out.append(Block("phase", text=line[4:], body=body))
+            out.append(Block("phase", text=line[4:], body=body, line=number))
         elif line.startswith("## "):
-            out.append(Block("h2", text=line[3:]))
+            out.append(Block("h2", text=line[3:], line=number))
             i += 1
         elif line.startswith("# "):
-            out.append(Block("h1", text=line[2:]))
+            out.append(Block("h1", text=line[2:], line=number))
             i += 1
         elif UL_ITEM.match(line):
             items, i = _take(lines, i, UL_ITEM)
-            out.append(Block("ul", items=tuple(items)))
+            out.append(Block("ul", items=tuple(items), line=number))
         elif OL_ITEM.match(line):
             items, i = _take(lines, i, OL_ITEM)
-            out.append(Block("ol", items=tuple(items)))
+            out.append(Block("ol", items=tuple(items), line=number))
         elif LEAD_LINE.match(line):
             parts, i = _take(lines, i, LEAD_LINE)
-            out.append(Block("lead", text=" ".join(parts)))
+            out.append(Block("lead", text=" ".join(parts), line=number))
         elif TABLE_ROW.match(line):
             rows, i = _take(lines, i, TABLE_ROW)
-            out.append(Block("table", rows=_table_rows(rows)))
+            out.append(Block("table", rows=_table_rows(rows), line=number))
         elif _is_note(line):
-            out.append(Block("note", text=line.strip("*")))
+            out.append(Block("note", text=line.strip("*"), line=number))
             i += 1
         else:
             parts = [line]
@@ -445,5 +455,5 @@ def _blocks(lines: list[str]) -> list[Block]:
             while i < len(lines) and lines[i].strip() and not BLOCK_START.match(lines[i]):
                 parts.append(lines[i])
                 i += 1
-            out.append(Block("para", text=" ".join(parts)))
+            out.append(Block("para", text=" ".join(parts), line=number))
     return out
