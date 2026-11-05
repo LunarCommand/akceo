@@ -37,11 +37,13 @@ def test_the_guide_holds_the_syntax_reference_and_the_demo_deck():
 def test_headings_in_code_fences_stay_as_written(generator: Any):
     text = (
         "# Title\n\n```markdown\n# My Talk\n## Agenda\n```\n\n"
-        "## Next\n\n````\n```\n# kept\n````\n#5 is a link\n"
+        "## Next\n\n````\n```\n# kept\n````\n#5 is a link\n\n"
+        "```\n```markdown\n# inside\n`````  \n# after\n"
     )
     assert generator.demoted(text) == (
         "## Title\n\n```markdown\n# My Talk\n## Agenda\n```\n\n"
-        "### Next\n\n````\n```\n# kept\n````\n#5 is a link"
+        "### Next\n\n````\n```\n# kept\n````\n#5 is a link\n\n"
+        "```\n```markdown\n# inside\n`````  \n## after"
     )
 
 

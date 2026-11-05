@@ -49,7 +49,8 @@ def _lines(text: str) -> Iterator[tuple[str, bool]]:
     fence = ""
     for line in text.strip().splitlines():
         if fence:
-            if line.startswith(fence):
+            end = line.rstrip(" \t")
+            if len(end) >= len(fence) and end == fence[0] * len(end):
                 fence = ""
             yield line, True
         elif opening := FENCE.match(line):
