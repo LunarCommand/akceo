@@ -10,11 +10,13 @@ def is_file(path: Path) -> bool:
     return os.path.isfile(path)
 
 
-def read_text(path: Path, what: str) -> str:
+def read_text(path: Path, what: str, newline: str | None = None) -> str:
     """Read a user-supplied UTF-8 file, turning read and decode failures into a DeckError. `what`
-    names the file in the decode message, e.g. "deck" or "theme"."""
+    names the file in the decode message, e.g. "deck" or "theme". `newline` is open()'s: "" keeps
+    line endings as they are in the file."""
     try:
-        return path.read_text(encoding="utf-8")
+        with path.open(encoding="utf-8", newline=newline) as f:
+            return f.read()
     except FileNotFoundError:
         raise DeckError(f"{path}: no such file") from None
     except UnicodeDecodeError as e:

@@ -196,7 +196,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    cli["cli.py<br/>akceo build / check / themes / viewer"] --> render["render.py<br/>build()"]
+    cli["cli.py<br/>akceo build / check / themes / viewer / docs / init"] --> render["render.py<br/>build()"]
     render --> parse["parse.py<br/>load(), validation"]
     parse --> files["files.py<br/>read_text()"]
     render --> themes["themes.py<br/>load(), token check"]
@@ -212,6 +212,7 @@ flowchart TD
     render --> assets[["assets/<br/>page.html · base.css · deck.js · diagrams.js"]]
     themes --> builtin[["themes/<br/>midnight.css · paper.css"]]
     cli --> viewer[["assets/md-viewer.html"]]
+    cli --> guide[["guide.md · assets/init-block.md"]]
     parse -.->|raises| err["errors.py<br/>DeckError"]
     themes -.->|raises| err
     images -.->|raises| err
@@ -222,7 +223,7 @@ flowchart TD
 
 | Module | Job |
 | --- | --- |
-| `cli.py` | Parses arguments, runs a command, writes the output, turns `DeckError` into a message and exit code 1. `check` runs the build and writes nothing. |
+| `cli.py` | Parses arguments, runs a command, writes the output, turns `DeckError` into a message and exit code 1. `check` runs the build and writes nothing. `docs` prints the guide for agents, and `init` points to it from a folder's `AGENTS.md` and `CLAUDE.md`. |
 | `render.py` | Runs the build: loads the deck and theme, embeds images, checks diagrams, renders each slide, fills the page template |
 | `parse.py` | Turns Markdown into a validated `Deck`. All input rules live here, except those that need the image itself, such as a crop past its edge, which `images.py` checks. |
 | `themes.py` | Finds a theme by name or path, checks that it sets every token, and reads the token values that Mermaid diagrams use |
@@ -480,6 +481,22 @@ fill the browser history. A hash typed into the address bar moves to that slide.
 
 In a deck with diagrams, `diagrams.js` draws them once, on load, including those on slides that
 aren't showing yet. See [Diagrams](#diagrams).
+
+### The guide for agents
+
+`src/akceo/guide.md` ships in the package. It's the guide that `akceo docs` prints, for an AI
+agent writing a deck. It isn't named `AGENTS.md`, because some coding agents read an `AGENTS.md`
+as instructions for the folder it's in, and this one is about decks, not akceo's code.
+`scripts/build_guide.py` generates it from `docs/agent/tldr.md`, `docs/syntax.md`,
+`docs/agent/deck-recipes.md` and the demo deck, so the format reference has one source. A test
+fails while the committed guide differs from what the script writes.
+
+`akceo init` appends `assets/init-block.md` to a folder's `AGENTS.md` and `CLAUDE.md`, which is
+where coding agents look for instructions. The block tells an agent to read the guide and to run
+`akceo check` after every edit. It reads both files before it writes either, keeps each file's
+line endings, and won't follow a link out of the folder. The block ends with an
+`<!-- akceo-init -->` comment, so a second run finds it and changes nothing, and a write cut off
+partway doesn't count as done.
 
 ### The notes viewer
 
