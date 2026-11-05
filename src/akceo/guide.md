@@ -349,9 +349,9 @@ any.
 | Token | Used for |
 | --- | --- |
 | `--bg` | Page background, and the numbers in `steps` |
-| `--line` | Table rules, the key hint, and the border of an image placeholder |
+| `--line` | Table rules and the border of an image placeholder |
 | `--text` | Body text |
-| `--muted` | Paragraphs, notes, the meta line, `((dimmed))` text |
+| `--muted` | Paragraphs, notes, the meta line, `((dimmed))` text, the slide count and the key hint |
 | `--strong` | Bold text in lists and the first table column, phase names, `***strong***` |
 | `--accent` | Kickers, list markers, `==accent==`, table headers, the progress bar |
 | `--accent2` | Code |
