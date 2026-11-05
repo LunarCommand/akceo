@@ -15,8 +15,10 @@ ROOT = Path(__file__).parents[1]
 DEMO = ROOT / "examples" / "demo"
 EXTERNAL_REF = re.compile(r"""(src|href)=["']?(https?:|//|\.{0,2}/)|<link|@import|url\(""")
 # A link out of the deck loads nothing into it, so it's allowed, as long as it opens in a new tab.
-# The external-reference checks run on the page with those links taken out.
+# Nor do the page's canonical address and its icon, built in as a data: URI. The external-reference
+# checks run on the page with these taken out.
 OUTSIDE_LINK = re.compile(r'<a href="(?:https?|mailto):[^"]*"( target="_blank" rel="noopener noreferrer")?>')
+HEAD_LINK = re.compile(r'<link rel="(?:canonical" href="https?://[^"]*|icon" href="data:image/[^"]*)">')
 # The page carries Mermaid packed, so the full check reads everything else in it. Mermaid itself
 # holds url(#marker) references inside its SVGs and CSS keywords such as @import as strings, so,
 # unpacked, it gets a narrower check of its own: nothing that would load from outside. The browser
@@ -27,6 +29,10 @@ CSP = (
 )
 PACKED = re.compile(r'(<script type="application/octet-stream" id="mermaid-packed">)([^<]*)(</script>)')
 OUTSIDE_LOAD = re.compile(r"""(src|href)=["']?(https?:|//)|(url\(|@import\s*(url\()?)["']?(https?:|//)""")
+
+
+def without_allowed_links(page: str) -> str:
+    return HEAD_LINK.sub("", OUTSIDE_LINK.sub("", page))
 
 
 def unpacked(page: str) -> str:
@@ -51,8 +57,8 @@ def test_builds_the_demo_deck_self_contained(tmp_path: Path, capsys: pytest.Capt
     assert page.count("/*! Mermaid ") == 1
     links = OUTSIDE_LINK.findall(page)
     assert links and all(links), "every link out of the deck opens in a new tab"
-    assert not EXTERNAL_REF.search(OUTSIDE_LINK.sub("", page))
-    assert not OUTSIDE_LOAD.search(OUTSIDE_LINK.sub("", unpacked(page)))
+    assert not EXTERNAL_REF.search(without_allowed_links(page))
+    assert not OUTSIDE_LOAD.search(without_allowed_links(unpacked(page)))
     assert "Author note" not in page
 
 
@@ -289,6 +295,74 @@ def test_check_reports_without_writing(tmp_path: Path, capsys: pytest.CaptureFix
     assert main(["check", str(deck)]) == 1
     assert "flow.mmd:1: Mermaid doesn't recognise the diagram type" in capsys.readouterr().err
     assert not (tmp_path / "demo" / "deck.html").exists()
+
+
+def test_site_metadata_reaches_the_page(tmp_path: Path):
+    Image.new("RGB", (600, 300)).save(tmp_path / "logo.png")
+    (tmp_path / "deck.md").write_text(
+        'title: Akceo\ndescription: Decks "for" agents & <people>\nurl: https://akceo.ai/\nicon: logo.png\n'
+        "---\n## One\n"
+    )
+    page, _ = render.build(tmp_path / "deck.md")
+    head = page[page.index("<title>") : page.index("<style>")]
+    icon = re.search(r'<link rel="icon" href="data:image/png;base64,([^"]+)">', head)
+    assert icon
+    with Image.open(io.BytesIO(base64.b64decode(icon[1]))) as im:
+        assert im.size == (256, 128)
+    described = 'content="Decks &quot;for&quot; agents &amp; &lt;people&gt;"'
+    assert head.replace(icon[0], "ICON") == (
+        "<title>Akceo</title>\n"
+        f'<meta name="description" {described}>\n'
+        f'<meta property="og:description" {described}>\n'
+        '<link rel="canonical" href="https://akceo.ai/">\n'
+        '<meta property="og:url" content="https://akceo.ai/">\n'
+        '<meta property="og:type" content="website">\n'
+        '<meta property="og:title" content="Akceo">\n'
+        '<meta name="twitter:card" content="summary">\n'
+        "ICON\n"
+    )
+    assert page.count(CSP) == 1
+    assert not EXTERNAL_REF.search(without_allowed_links(page))
+
+
+@pytest.mark.parametrize(
+    ("config", "present", "absent"),
+    [
+        ("description: D\n", ['name="description"', "og:title", "twitter:card"], ["canonical", "og:url"]),
+        (
+            "url: https://x.example/\n",
+            ["canonical", "og:title", "twitter:card"],
+            ["description", "og:description"],
+        ),
+        ("icon: logo.svg\n", ['<link rel="icon" href="data:image/svg+xml;base64,'], ["og:", "twitter:"]),
+    ],
+    ids=["description", "url", "icon"],
+)
+def test_each_metadata_key_adds_only_its_own_tags(
+    tmp_path: Path, config: str, present: list[str], absent: list[str]
+):
+    (tmp_path / "logo.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg"/>')
+    (tmp_path / "deck.md").write_text(f"{config}---\n## One\n")
+    page, _ = render.build(tmp_path / "deck.md")
+    head = page[: page.index("<style>")]
+    assert all(tag in head for tag in present)
+    assert not any(tag in head for tag in absent)
+
+
+def test_a_deck_without_metadata_keys_gets_no_extra_tags(tmp_path: Path):
+    (tmp_path / "deck.md").write_text("title: T\n---\n## One\n")
+    page, _ = render.build(tmp_path / "deck.md")
+    assert (
+        '<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>T</title>\n<style>'
+        in page
+    )
+
+
+def test_icon_errors_name_the_deck(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    deck = tmp_path / "deck.md"
+    deck.write_text("icon: gone.png\n---\n## One\n")
+    assert main(["check", str(deck)]) == 1
+    assert capsys.readouterr().err == f"akceo: {deck}: icon: image not found: {tmp_path / 'gone.png'}\n"
 
 
 def test_bad_theme_in_deck_names_the_deck(tmp_path: Path, capsys: pytest.CaptureFixture[str]):

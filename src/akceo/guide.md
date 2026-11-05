@@ -75,9 +75,16 @@ The config block is everything before the first `---`. It may hold only `key: va
 | Key | Meaning | Default |
 | --- | --- | --- |
 | `title` | Page title shown in the browser tab | The file name without `.md` |
+| `description` | A sentence or two about the deck, for search results and link previews | None |
+| `url` | The page's full address once it's published, starting `https://` or `http://` | None |
+| `icon` | Image for the browser tab, relative to the deck: PNG, JPEG, WebP or SVG. PNG, JPEG and WebP are shrunk to fit 256 pixels; SVG stays sharp at any size. Safari shows the icon only when the page is served from a website, not when it's opened from a file. | None |
 | `theme` | Built-in theme name, or a path to a `.css` file relative to the deck | `midnight` |
 | `images` | Folder to read slide images from, relative to the deck | The deck's folder |
 | `image-frame` | `no` puts every image straight on the slide, with no panel behind it. See [Images](#images). | `yes` |
+
+`description` and `url` are for a deck published on the web. `url` tells search engines which
+address is the page's own. Either key also adds the Open Graph tags that link previews read,
+with the deck's `title`. None of the three loads anything, so the page still opens from disk.
 
 ### Slides
 
@@ -342,9 +349,9 @@ any.
 | Token | Used for |
 | --- | --- |
 | `--bg` | Page background, and the numbers in `steps` |
-| `--line` | Table rules, the key hint, and the border of an image placeholder |
+| `--line` | Table rules and the border of an image placeholder |
 | `--text` | Body text |
-| `--muted` | Paragraphs, notes, the meta line, `((dimmed))` text |
+| `--muted` | Paragraphs, notes, the meta line, `((dimmed))` text, the slide count and the key hint |
 | `--strong` | Bold text in lists and the first table column, phase names, `***strong***` |
 | `--accent` | Kickers, list markers, `==accent==`, table headers, the progress bar |
 | `--accent2` | Code |

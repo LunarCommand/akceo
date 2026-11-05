@@ -3,13 +3,14 @@
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from akceo import files
 from akceo.errors import DeckError
 
 LAYOUTS = ("title", "bullets", "split", "steps", "table", "image")
 DEFAULT_LAYOUT = "bullets"
-CONFIG_KEYS = ("title", "theme", "images", "image-frame")
+CONFIG_KEYS = ("title", "description", "url", "icon", "theme", "images", "image-frame")
 STYLE_KEYS = ("style-h1", "style-h2", "style-lead", "style-ul", "style-ol", "style-sub")
 COMMON_KEYS = ("layout", "kicker", *STYLE_KEYS)
 LAYOUT_KEYS: dict[str, tuple[str, ...]] = {
@@ -147,6 +148,12 @@ def parse(text: str, path: Path) -> Deck:
             )
         if key in FLAG_KEYS and value not in ("yes", "no"):
             raise _error(path, line, f"'{key}' must be yes or no, not '{value}'")
+        if key == "url" and not _is_page_url(value):
+            raise _error(
+                path,
+                line,
+                f"'url' must be the page's full address, starting https:// or http://, not '{value}'",
+            )
         config[key] = value
     if any(_has_content(line) for line in rest):
         raise _error(
@@ -202,6 +209,20 @@ def _check_links(path: Path, slide: Slide, count: int) -> None:
                     f"slide {slide.number}: can't link to '{written}'; a link goes to an https:, http: or "
                     "mailto: address, or to a slide as #N",
                 )
+
+
+def _is_page_url(value: str) -> bool:
+    """Whether value is a full http:// or https:// address with a host. urlsplit, and reading the
+    port, raise ValueError on a malformed authority, such as an unclosed IPv6 bracket or a port
+    that isn't a number."""
+    if any(c.isspace() for c in value):
+        return False
+    try:
+        parts = urlsplit(value)
+        _ = parts.port
+    except ValueError:
+        return False
+    return parts.scheme in ("http", "https") and bool(parts.hostname)
 
 
 def _names_a_slide(digits: str, count: int) -> bool:

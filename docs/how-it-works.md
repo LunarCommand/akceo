@@ -342,8 +342,10 @@ literal and why raw HTML is always escaped:
 4. Put the code spans back, escaped.
 5. Turn hard line breaks into `<br>`.
 
-The page comes from `assets/page.html`, which has five placeholders filled in one pass: title,
-styles, slides, script and diagram scripts. The last is empty unless a slide has a diagram. Filling them in one pass means slide text that happens to contain a
+The page comes from `assets/page.html`, which has six placeholders filled in one pass: title,
+head tags, styles, slides, script and diagram scripts. The head tags come from the
+`description`, `url` and `icon` config keys, and are empty without them. The diagram scripts
+are empty unless a slide has a diagram. Filling them in one pass means slide text that happens to contain a
 placeholder name is never replaced.
 
 ### Themes
@@ -465,7 +467,7 @@ Every problem the user can fix is a `DeckError`, with a message in one of these 
 
 ```text
 deck.md:14: slide 3: the steps layout needs a 1. list
-deck.md:2: unknown config key 'diagrams' (expected one of: title, theme, images)
+deck.md:2: unknown config key 'diagrams' (expected one of: title, description, url, icon, theme, images, image-frame)
 theme brand.css doesn't set: --figure-bg
 ```
 

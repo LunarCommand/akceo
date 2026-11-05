@@ -12,7 +12,8 @@ from akceo.parse import BREAK, Deck, Slide
 
 ASSETS = resources.files("akceo") / "assets"
 DEFAULT_IMAGE_MAX = 2400
-PLACEHOLDER = re.compile(r"__(TITLE|STYLE|SLIDES|SCRIPT|DIAGRAMS)__")
+ICON_MAX = 256
+PLACEHOLDER = re.compile(r"__(TITLE|HEAD|STYLE|SLIDES|SCRIPT|DIAGRAMS)__")
 
 ESCAPES = (("&", "&amp;"), ("<", "&lt;"), (">", "&gt;"), ("≥", "&ge;"), ("≤", "&le;"), ("·", "&middot;"))
 CODE = "\x00"  # brackets the index of a stashed `code` span, keeping it safe from the other inline rules
@@ -49,6 +50,7 @@ def build(deck_path: Path, theme: str | None = None) -> tuple[str, int]:
             sections.append(render_slide(slide, image_src, deck.framed(slide), diagram))
     values = {
         "TITLE": escape(deck.title),
+        "HEAD": _head(deck),
         "STYLE": _asset("base.css") + "\n" + theme_css,
         "SLIDES": "\n\n".join(sections),
         "SCRIPT": _asset("deck.js"),
@@ -60,6 +62,33 @@ def build(deck_path: Path, theme: str | None = None) -> tuple[str, int]:
 
 def _asset(name: str) -> str:
     return (ASSETS / name).read_text(encoding="utf-8")
+
+
+def _head(deck: Deck) -> str:
+    """The tags that describe the page to search engines and link previews, and its icon."""
+    description, url, icon = (deck.config.get(key) for key in ("description", "url", "icon"))
+    tags: list[str] = []
+    if description:
+        tags += [_meta("name", "description", description), _meta("property", "og:description", description)]
+    if url:
+        tags += [f'<link rel="canonical" href="{html.escape(url)}">', _meta("property", "og:url", url)]
+    if description or url:
+        tags += [
+            _meta("property", "og:type", "website"),
+            _meta("property", "og:title", deck.title),
+            _meta("name", "twitter:card", "summary"),
+        ]
+    if icon:
+        try:
+            src = images.data_uri(deck.path.parent / Path(icon).expanduser(), (ICON_MAX, ICON_MAX))
+        except DeckError as e:
+            raise DeckError(f"{deck.path}: icon: {e}") from None
+        tags.append(f'<link rel="icon" href="{src}">')
+    return "".join("\n" + tag for tag in tags)
+
+
+def _meta(attribute: str, name: str, content: str) -> str:
+    return f'<meta {attribute}="{name}" content="{html.escape(content)}">'
 
 
 def _is_diagram(slide: Slide) -> bool:
