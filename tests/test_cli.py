@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from akceo import render
+from akceo import cli, render
 from akceo.cli import main
 
 ROOT = Path(__file__).parents[1]
@@ -322,6 +322,156 @@ def test_viewer_out_may_be_a_folder_or_a_file(tmp_path: Path):
     assert (tmp_path / "md-viewer.html").is_file()
     assert main(["viewer", "-o", str(tmp_path / "notes.html")]) == 0
     assert (tmp_path / "notes.html").is_file()
+
+
+GUIDE = ROOT / "src" / "akceo" / "guide.md"
+SECTION = (ROOT / "src" / "akceo" / "assets" / "init-block.md").read_text()
+NEXT = "next: run akceo docs --print and read the guide before writing a deck\n"
+
+
+def test_docs_prints_where_the_guide_is(capsys: pytest.CaptureFixture[str]):
+    assert main(["docs"]) == 0
+    path = Path(capsys.readouterr().out.removesuffix("\n"))
+    assert path.is_absolute() and path.read_text() == GUIDE.read_text()
+
+
+def test_docs_print_prints_the_guide(capsys: pytest.CaptureFixture[str]):
+    assert main(["docs", "--print"]) == 0
+    assert capsys.readouterr().out == GUIDE.read_text()
+
+
+def test_init_writes_both_files(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    assert main(["init", str(tmp_path)]) == 0
+    assert (tmp_path / "AGENTS.md").read_text() == (tmp_path / "CLAUDE.md").read_text() == SECTION
+    out = capsys.readouterr().out
+    assert out == f"wrote {tmp_path / 'AGENTS.md'}\nwrote {tmp_path / 'CLAUDE.md'}\n{NEXT}"
+
+
+@pytest.mark.parametrize(
+    ("existing", "after"),
+    [
+        ("# Notes\n\nKeep it short.\n", "# Notes\n\nKeep it short.\n\n" + SECTION),
+        ("# Notes", "# Notes\n\n" + SECTION),
+        ("# Notes\n\n\n", "# Notes\n\n\n" + SECTION),
+        ("# Notes  \n", "# Notes  \n\n" + SECTION),
+        ("\n", "\n" + SECTION),
+        # A file with Windows line endings keeps them, and the section takes them too.
+        (
+            "# Notes\r\n\r\nKeep it short.\r\n",
+            ("# Notes\n\nKeep it short.\n\n" + SECTION).replace("\n", "\r\n"),
+        ),
+    ],
+)
+def test_init_appends_to_a_file_that_exists(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], existing: str, after: str
+):
+    (tmp_path / "CLAUDE.md").write_bytes(existing.encode())
+    assert main(["init", str(tmp_path)]) == 0
+    assert (tmp_path / "CLAUDE.md").read_bytes() == after.encode()
+    assert f"added the akceo section to {tmp_path / 'CLAUDE.md'}\n" in capsys.readouterr().out
+
+
+def test_init_again_changes_nothing(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    (tmp_path / "CLAUDE.md").write_text("# Notes\n")
+    main(["init", str(tmp_path)])
+    before = {path.name: path.read_text() for path in tmp_path.iterdir()}
+    capsys.readouterr()
+    assert main(["init", str(tmp_path)]) == 0
+    assert {path.name: path.read_text() for path in tmp_path.iterdir()} == before
+    assert capsys.readouterr().out == (
+        f"{tmp_path / 'AGENTS.md'} already has the akceo section\n"
+        f"{tmp_path / 'CLAUDE.md'} already has the akceo section\n{NEXT}"
+    )
+
+
+def test_init_dry_run_changes_nothing(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    (tmp_path / "CLAUDE.md").write_text("# Notes\n")
+    assert main(["init", "--dry-run", str(tmp_path)]) == 0
+    assert [path.name for path in tmp_path.iterdir()] == ["CLAUDE.md"]
+    assert (tmp_path / "CLAUDE.md").read_text() == "# Notes\n"
+    assert capsys.readouterr().out == (
+        f"would write {tmp_path / 'AGENTS.md'}\n"
+        f"would add the akceo section to {tmp_path / 'CLAUDE.md'}\n{NEXT}"
+    )
+
+
+def test_init_defaults_to_the_working_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    monkeypatch.chdir(tmp_path)
+    assert main(["init"]) == 0
+    assert capsys.readouterr().out == f"wrote AGENTS.md\nwrote CLAUDE.md\n{NEXT}"
+
+
+@pytest.mark.parametrize("name", ["decks", "x" * 300])
+def test_init_needs_a_folder(tmp_path: Path, capsys: pytest.CaptureFixture[str], name: str):
+    # Path.is_dir() raises for a name too long on Python 3.12 and 3.13, which was a traceback.
+    assert main(["init", str(tmp_path / name)]) == 1
+    assert capsys.readouterr().err == f"akceo: {tmp_path / name}: not a folder\n"
+
+
+def test_the_section_ends_with_the_marker_init_looks_for():
+    # Last, so a write cut off partway leaves no marker, and the next run adds the section again.
+    assert SECTION.count(cli.INIT_MARKER) == 1
+    assert SECTION.endswith(cli.INIT_MARKER + "\n")
+
+
+def test_init_reads_both_files_before_writing_either(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    (tmp_path / "CLAUDE.md").write_bytes("caf\xe9\n".encode("latin-1"))
+    assert main(["init", str(tmp_path)]) == 1
+    assert [path.name for path in tmp_path.iterdir()] == ["CLAUDE.md"]
+    assert capsys.readouterr().err == (
+        f"akceo: {tmp_path / 'CLAUDE.md'}:1: not valid UTF-8 text; save the file as UTF-8\n"
+    )
+
+
+@pytest.mark.parametrize("target", ["../outside/notes.md", "../outside/missing.md"])
+def test_init_leaves_a_link_out_of_the_folder_alone(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], target: str
+):
+    (tmp_path / "outside").mkdir()
+    (tmp_path / "outside" / "notes.md").write_text("# Mine\n")
+    (tmp_path / "decks").mkdir()
+    (tmp_path / "decks" / "CLAUDE.md").symlink_to(target)
+    assert main(["init", str(tmp_path / "decks")]) == 1
+    assert sorted(path.name for path in (tmp_path / "outside").iterdir()) == ["notes.md"]
+    assert (tmp_path / "outside" / "notes.md").read_text() == "# Mine\n"
+    assert [path.name for path in (tmp_path / "decks").iterdir()] == ["CLAUDE.md"]
+    err = capsys.readouterr().err
+    assert err.startswith(f"akceo: {tmp_path / 'decks' / 'CLAUDE.md'} links to ")
+    assert err.endswith(f", outside {tmp_path / 'decks'}; akceo init writes only inside it\n")
+
+
+def test_init_refuses_a_link_to_nothing(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    (tmp_path / "CLAUDE.md").symlink_to("notes/CLAUDE.md")
+    assert main(["init", str(tmp_path)]) == 1
+    assert [path.name for path in tmp_path.iterdir()] == ["CLAUDE.md"]
+    assert capsys.readouterr().err.endswith("notes/CLAUDE.md, which doesn't exist\n")
+
+
+@pytest.mark.parametrize(
+    ("agents", "dry_run", "verb"),
+    [
+        ("# Agents\n", False, "added the akceo section to"),
+        ("# Agents\n", True, "would add the akceo section to"),
+        # CLAUDE.md links to an AGENTS.md that doesn't exist yet, and the run creates it.
+        (None, False, "wrote"),
+        (None, True, "would write"),
+    ],
+)
+def test_init_adds_the_section_once_to_two_names_for_one_file(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], agents: str | None, dry_run: bool, verb: str
+):
+    if agents is not None:
+        (tmp_path / "AGENTS.md").write_text(agents)
+    (tmp_path / "CLAUDE.md").symlink_to("AGENTS.md")
+    assert main(["init", *(["--dry-run"] if dry_run else []), str(tmp_path)]) == 0
+    assert capsys.readouterr().out == (
+        f"{verb} {tmp_path / 'AGENTS.md'}\n"
+        f"{tmp_path / 'CLAUDE.md'} is the same file as {tmp_path / 'AGENTS.md'}\n{NEXT}"
+    )
+    if not dry_run:
+        assert (tmp_path / "AGENTS.md").read_text() == (agents + "\n" if agents else "") + SECTION
 
 
 def test_packaged_assets_contain_no_raw_control_characters():
