@@ -44,7 +44,8 @@ def data_uri(
     except UnidentifiedImageError:
         raise DeckError("image-damaged", f"not a readable image: {path}") from None
     except OSError as e:
-        raise DeckError("file-unreadable", f"can't read image {path}: {e.strerror or e}") from None
+        code = "file-unreadable" if e.errno is not None else "image-damaged"
+        raise DeckError(code, f"can't read image {path}: {e.strerror or e}") from None
     except Image.DecompressionBombError as e:
         raise DeckError("image-too-large", f"can't process image {path}: {e}") from None
     # Pillow reports some damaged or unsupported images with these rather than OSError: EXIF that
