@@ -7,15 +7,17 @@ It isn't a free-form HTML tool, and it reads only its own small set of Markdown.
 raw HTML: `<` and `&` show as text. Each slide has one of six layouts, and each layout takes only
 certain kinds of content. Many mistakes stop the build with a message that names the file, the
 slide and a line: an unknown key, content the layout doesn't take, a missing image, or a diagram
-Mermaid can't parse. Not every mistake does. Markdown that akceo doesn't support shows as plain
-text, with no error; the recipes below list what to avoid.
+Mermaid can't parse. Other mistakes build but probably aren't what you meant, such as Markdown
+that akceo doesn't support, which shows as plain text. `akceo check` warns about those; the recipes
+below list what to avoid.
 
 ## How to work
 
 1. Pick each slide's layout first: `title`, `bullets`, `split`, `steps`, `table` or `image`.
 2. Write the deck.
 3. Run `akceo check deck.md` after every edit, and fix what it reports. It stops at the first
-   problem, so run it again until it prints `ok`.
+   problem, so run it again until it prints `ok`. Then fix its warnings, unless one is about
+   something you meant, such as an image you'll add later.
 4. Run `akceo build deck.md` to write `deck.html` next to the deck.
 5. `ok` means akceo found nothing wrong, not that every slide looks right. Have the built page
    looked at, above all the slides with a diagram, which can show an error only when the page
@@ -40,12 +42,13 @@ text, with no error; the recipes below list what to avoid.
 | `deck` | The deck's path, as given |
 | `slides` | The number of slides, or `null` when there's an error |
 | `errors` | The problem found, or an empty list. Checking stops at the first problem, so there's one at most |
+| `warnings` | What builds but probably isn't what you meant, or an empty list. Empty when there's an error |
 
-Each error has:
+Each error and each warning has:
 
 | Field | Holds |
 | --- | --- |
-| `code` | The kind of problem, such as `block-missing`; the Error codes section lists them all |
+| `code` | The kind of problem, such as `block-missing` or `markdown-bullet`; the Error codes and Warning codes sections list them all |
 | `message` | What's wrong, without the file and line |
 | `file`, `line`, `slide` | Where the problem is, usually in the deck. Each is `null` when it doesn't apply |
 | `in` | The file and line inside another file the slide uses, such as its diagram, or `null` |

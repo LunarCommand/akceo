@@ -48,6 +48,18 @@ Code = Literal[
 ]
 CODES: tuple[Code, ...] = get_args(Code)
 
+# The same, for warnings: what builds but probably isn't what the author meant.
+WarningCode = Literal[
+    "slide-dense",
+    "image-placeholder",
+    "markdown-code-fence",
+    "markdown-nested-list",
+    "markdown-bullet",
+    "markdown-heading",
+    "key-in-text",
+]
+WARNING_CODES: tuple[WarningCode, ...] = get_args(WarningCode)
+
 
 @dataclass(frozen=True)
 class Place:

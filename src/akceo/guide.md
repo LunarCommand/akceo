@@ -11,15 +11,17 @@ It isn't a free-form HTML tool, and it reads only its own small set of Markdown.
 raw HTML: `<` and `&` show as text. Each slide has one of six layouts, and each layout takes only
 certain kinds of content. Many mistakes stop the build with a message that names the file, the
 slide and a line: an unknown key, content the layout doesn't take, a missing image, or a diagram
-Mermaid can't parse. Not every mistake does. Markdown that akceo doesn't support shows as plain
-text, with no error; the recipes below list what to avoid.
+Mermaid can't parse. Other mistakes build but probably aren't what you meant, such as Markdown
+that akceo doesn't support, which shows as plain text. `akceo check` warns about those; the recipes
+below list what to avoid.
 
 ## How to work
 
 1. Pick each slide's layout first: `title`, `bullets`, `split`, `steps`, `table` or `image`.
 2. Write the deck.
 3. Run `akceo check deck.md` after every edit, and fix what it reports. It stops at the first
-   problem, so run it again until it prints `ok`.
+   problem, so run it again until it prints `ok`. Then fix its warnings, unless one is about
+   something you meant, such as an image you'll add later.
 4. Run `akceo build deck.md` to write `deck.html` next to the deck.
 5. `ok` means akceo found nothing wrong, not that every slide looks right. Have the built page
    looked at, above all the slides with a diagram, which can show an error only when the page
@@ -44,12 +46,13 @@ text, with no error; the recipes below list what to avoid.
 | `deck` | The deck's path, as given |
 | `slides` | The number of slides, or `null` when there's an error |
 | `errors` | The problem found, or an empty list. Checking stops at the first problem, so there's one at most |
+| `warnings` | What builds but probably isn't what you meant, or an empty list. Empty when there's an error |
 
-Each error has:
+Each error and each warning has:
 
 | Field | Holds |
 | --- | --- |
-| `code` | The kind of problem, such as `block-missing`; the Error codes section lists them all |
+| `code` | The kind of problem, such as `block-missing` or `markdown-bullet`; the Error codes and Warning codes sections list them all |
 | `message` | What's wrong, without the file and line |
 | `file`, `line`, `slide` | Where the problem is, usually in the deck. Each is `null` when it doesn't apply |
 | `in` | The file and line inside another file the slide uses, such as its diagram, or `null` |
@@ -441,6 +444,24 @@ reading the message. A code is never renamed or reused.
 | `init-link-outside` | `AGENTS.md` or `CLAUDE.md` links to a file outside the folder |
 | `init-broken-link` | `AGENTS.md` or `CLAUDE.md` links to a file that doesn't exist |
 
+### Warning codes
+
+A warning is about something that builds but probably isn't what you meant. `akceo check` and
+`akceo build` print each one and carry on; `akceo check --json` lists them. Each code is given at
+most once a slide, at its first line. A deck with an error gets no warnings, since the error is
+what to fix first, but a layout error that one of these lines causes gives the warning's reason
+too.
+
+| Code | Given when |
+| --- | --- |
+| `slide-dense` | A slide has more than 100 words. akceo can't tell whether it overflows, so look at the built page |
+| `image-placeholder` | A `split` or `image` slide has no `image:` yet, so it shows a dashed box |
+| `markdown-code-fence` | A line starts with ```` ``` ```` or `~~~`. akceo has no code blocks yet, so it shows as text |
+| `markdown-nested-list` | An indented list item, which joins the item above it as text |
+| `markdown-bullet` | A list item that starts with `*` or `+`, which shows as text |
+| `markdown-heading` | A heading with four or more `#`, which shows as text |
+| `key-in-text` | A slide key written as text: in lowercase anywhere in the slide's text, or capitalized at its top, where keys go |
+
 ## Deck recipes
 
 The syntax says what a deck can hold. These say what works.
@@ -450,10 +471,12 @@ The syntax says what a deck can hold. These say what works.
   blocks a layout takes when a slide has one it doesn't.
 - **Write only akceo's Markdown.** The blocks and marks in the syntax tables are all there is.
   Code fences, nested lists, `*` or `+` bullets and `####` headings show as plain text, and
-  `akceo check` doesn't flag them. A list is one level deep: an indented `- item` joins the item
+  `akceo check` warns about each. A list is one level deep: an indented `- item` joins the item
   above it.
 - **Keys go first, in lowercase.** A slide's keys end at the first line that isn't a key or a
   `//` note, so a key written after the blank line, or in capitals, shows on the slide as text.
+  `akceo check` warns about a lowercase key anywhere in the text, and a capitalized one at the
+  top of the slide.
 - **An image that doesn't exist yet:** leave out `image:`, and the slide shows a dashed box where
   it will go. Don't make up a file name, because a missing file stops the build.
 - **Diagrams:** put each one in its own `.mmd` file and use `image: name.mmd`. On a dark theme,
@@ -467,8 +490,8 @@ The syntax says what a deck can hold. These say what works.
   is a hard line break.
 - **`style-…` keys** are a last resort for spacing. If you reach for one often, the slide wants
   a different layout.
-- **Dense slides:** akceo can't tell yet whether text overflows a slide. Past about 100 words,
-  have the built page looked at, or split the slide.
+- **Dense slides:** akceo can't tell yet whether text overflows a slide. Past 100 words it
+  warns: have the built page looked at, or split the slide.
 
 ## A worked example
 

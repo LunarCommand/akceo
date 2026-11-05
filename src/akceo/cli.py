@@ -8,8 +8,9 @@ from collections.abc import Sequence
 from importlib.metadata import version
 from pathlib import Path
 
-from akceo import files, render, report, themes
+from akceo import files, lint, render, report, themes
 from akceo.errors import DeckError
+from akceo.parse import Deck
 
 VIEWER = "md-viewer.html"
 GUIDE = Path(__file__).with_name("guide.md")
@@ -85,11 +86,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _build(deck: Path, out: Path | None, theme: str | None) -> None:
-    page, count = render.build(deck, theme)
+    page, parsed = render.build(deck, theme)
     out = out or deck.with_suffix(".html")
     _write(out, page)
-    noun = "slide" if count == 1 else "slides"
-    print(f"wrote {out} ({out.stat().st_size / 1024:.0f} KB, {count} {noun})")
+    print(f"wrote {out} ({out.stat().st_size / 1024:.0f} KB, {_counts(parsed)})")
 
 
 def _check(deck: Path, theme: str | None, as_json: bool) -> int:
@@ -97,10 +97,25 @@ def _check(deck: Path, theme: str | None, as_json: bool) -> int:
         result = report.check(deck, theme)
         print(json.dumps(result, indent=2))
         return 0 if result["ok"] else 1
-    _, count = render.build(deck, theme)
-    noun = "slide" if count == 1 else "slides"
-    print(f"ok: {deck} ({count} {noun})")
+    _, parsed = render.build(deck, theme)
+    print(f"ok: {deck} ({_counts(parsed)})")
     return 0
+
+
+def _counts(deck: Deck) -> str:
+    """The deck's slide count, and its warnings' count when it has any. Each warning is printed
+    first, to stderr, as errors are."""
+    warnings = lint.find(deck)
+    for warning in warnings:
+        print(f"akceo: {warning}", file=sys.stderr)
+    counts = [_plural(len(deck.slides), "slide")]
+    if warnings:
+        counts.append(_plural(len(warnings), "warning"))
+    return ", ".join(counts)
+
+
+def _plural(count: int, noun: str) -> str:
+    return f"{count} {noun}" if count == 1 else f"{count} {noun}s"
 
 
 def _write_viewer(out: Path) -> None:

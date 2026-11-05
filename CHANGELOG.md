@@ -36,6 +36,12 @@ All notable changes to this project are documented here. The format follows
   fine, how many slides it has, or the problem with its file, line and slide. Every kind of problem
   has a code that never changes, such as `block-missing` or `diagram-syntax`, listed in
   `docs/syntax.md`.
+- Warnings, for what builds but probably isn't what you meant: a slide over 100 words, a slide
+  still showing an image placeholder, Markdown akceo doesn't read (code fences, nested lists,
+  `*` or `+` bullets, `####` headings), and a slide key written as slide text. `akceo check` and
+  `akceo build` print them and carry on, and `akceo check --json` lists them under `warnings`,
+  each with a code. A layout error that one of those lines causes gives the reason too, such as
+  a `* item` making a second paragraph.
 
 ### Changed
 
