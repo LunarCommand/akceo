@@ -29,6 +29,9 @@ All notable changes to this project are documented here. The format follows
   them if needed, that tells an agent to read the guide and to run `akceo check` after every
   edit. The rest of each file stays as it was. A second run changes nothing, `--dry-run` shows
   what it would do, and a file that links outside the folder is left alone.
+- Three config keys for a deck published on the web: `description:` and `url:` add the tags
+  that search engines and link previews read, and `icon:` builds an image into the page as its
+  browser-tab icon. A `url:` that isn't a full `https://` or `http://` address stops the build.
 
 ### Changed
 
@@ -39,6 +42,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- The key hint in the corner of the deck was hard to read. It used `--line`, which in both
+  built-in themes is close to the background. It now uses `--muted`, like the slide count.
 - A control character in a deck, such as a stray NUL, stops the build with its line. It
   used to crash with a Python traceback, or put invisible characters on the slide.
 - Ctrl-C during a command prints `akceo: interrupted` and exits with code 130, instead of
