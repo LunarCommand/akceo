@@ -148,6 +148,19 @@ def test_the_closing_fence_ends_the_code():
     ]
 
 
+@pytest.mark.parametrize(
+    "inner",
+    ["```", "~~~", "```python"],
+    ids=["shorter-run", "other-character", "text-after"],
+)
+def test_only_a_matching_fence_closes_the_code(inner: str):
+    opening = "````" if inner == "```" else "```"
+    deck = f"---\n## One\n\n{opening}\n{inner}\n* a\n{opening}\n* b\n"
+    assert warnings(deck)[1] == (
+        "deck.md:8: slide 1: warning: a list item that starts with * shows as text; use - instead"
+    )
+
+
 def test_each_code_is_given_once_a_slide_at_its_first_line_and_in_line_order():
     deck = "---\n## One\n\n#### a\n* b\n* c\n#### d\n---\n## Two\n\n* e\n"
     assert warnings(deck) == [

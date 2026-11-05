@@ -77,6 +77,7 @@ CROP = re.compile(r"([0-9]{1,9})" + r"(?:\s*,\s*|\s+)([0-9]{1,9})" * 3)
 CONTROL = re.compile(r"[\x00-\x08\x0b\x0e-\x1f]")
 # Markdown akceo doesn't read, and keys written as text, which stray_markdown() finds
 FENCE = re.compile(r"\s*(`{3,}|~{3,})")
+CLOSING_FENCE = re.compile(r"\s*(`{3,}|~{3,})\s*")
 NESTED_ITEM = re.compile(r"\s+(-|\d+\.) ")
 BULLET = re.compile(r"\s*([*+]) ")
 DEEP_HEADING = re.compile(r"(#{4,})(\s|$)")
@@ -370,17 +371,19 @@ def stray_markdown(lines: Iterable[tuple[int, str]]) -> dict[int, Stray]:
     "Image: a cat" is ordinary text."""
     found: dict[int, Stray] = {}
     fence: Stray | None = None
+    opened = ""
     at_top = True
     for number, line in lines:
         if _is_author_note(line):
             continue
         mark = FENCE.match(line)
         if fence is None and mark:
+            opened = mark[1]
             fence = ("markdown-code-fence", f"{mark[1]} shows as text; akceo has no code blocks yet")
             found[number] = fence
         elif fence is not None:
             found[number] = fence
-            if mark:
+            if _closes(line, opened):
                 fence = None
         else:
             key = KEY_LIKE.match(line)
@@ -388,6 +391,13 @@ def stray_markdown(lines: Iterable[tuple[int, str]]) -> dict[int, Stray]:
             if stray := _stray_line(line, key, at_top):
                 found[number] = stray
     return found
+
+
+def _closes(line: str, opened: str) -> bool:
+    """CommonMark's rule: a fence closes on a run of its opening's character, at least as long,
+    with nothing after it but whitespace."""
+    closing = CLOSING_FENCE.fullmatch(line)
+    return bool(closing) and closing[1][0] == opened[0] and len(closing[1]) >= len(opened)
 
 
 def _stray_line(line: str, key: re.Match[str] | None, at_top: bool) -> Stray | None:
