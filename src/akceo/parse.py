@@ -9,7 +9,7 @@ from akceo.errors import DeckError
 
 LAYOUTS = ("title", "bullets", "split", "steps", "table", "image")
 DEFAULT_LAYOUT = "bullets"
-CONFIG_KEYS = ("title", "theme", "images", "image-frame")
+CONFIG_KEYS = ("title", "description", "url", "icon", "theme", "images", "image-frame")
 STYLE_KEYS = ("style-h1", "style-h2", "style-lead", "style-ul", "style-ol", "style-sub")
 COMMON_KEYS = ("layout", "kicker", *STYLE_KEYS)
 LAYOUT_KEYS: dict[str, tuple[str, ...]] = {
@@ -64,6 +64,7 @@ STYLE_URL = re.compile(r"(url|image-set)\s*\(", re.IGNORECASE)
 CODE_SPAN = re.compile(r"`[^`]+`")
 LINK = re.compile(r"\[([^\]\n]+)\]\(([^)\n]*)\)")
 OUTSIDE_LINK = re.compile(r"(https?://|mailto:)[^\s\"'<>`\x01]+", re.IGNORECASE)  # \x01 is BREAK
+PAGE_URL = re.compile(r"https?://[^\s/]+(/\S*)?", re.IGNORECASE)
 SLIDE_LINK = re.compile(r"#([0-9]+)")  # ASCII digits only, as deck.js reads the hash
 # Pixel counts take at most nine ASCII digits. str.isdigit() also passes digits such as "²", which
 # int() rejects, and int() refuses a string past its digit limit.
@@ -147,6 +148,12 @@ def parse(text: str, path: Path) -> Deck:
             )
         if key in FLAG_KEYS and value not in ("yes", "no"):
             raise _error(path, line, f"'{key}' must be yes or no, not '{value}'")
+        if key == "url" and not PAGE_URL.fullmatch(value):
+            raise _error(
+                path,
+                line,
+                f"'url' must be the page's full address, starting https:// or http://, not '{value}'",
+            )
         config[key] = value
     if any(_has_content(line) for line in rest):
         raise _error(

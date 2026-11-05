@@ -29,6 +29,9 @@ All notable changes to this project are documented here. The format follows
   them if needed, that tells an agent to read the guide and to run `akceo check` after every
   edit. The rest of each file stays as it was. A second run changes nothing, `--dry-run` shows
   what it would do, and a file that links outside the folder is left alone.
+- Three config keys for a deck published on the web: `description:` and `url:` add the tags
+  that search engines and link previews read, and `icon:` builds an image into the page as its
+  browser-tab icon. A `url:` that isn't a full `https://` or `http://` address stops the build.
 
 ### Changed
 
