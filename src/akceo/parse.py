@@ -3,6 +3,7 @@
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from akceo import files
 from akceo.errors import DeckError
@@ -64,7 +65,6 @@ STYLE_URL = re.compile(r"(url|image-set)\s*\(", re.IGNORECASE)
 CODE_SPAN = re.compile(r"`[^`]+`")
 LINK = re.compile(r"\[([^\]\n]+)\]\(([^)\n]*)\)")
 OUTSIDE_LINK = re.compile(r"(https?://|mailto:)[^\s\"'<>`\x01]+", re.IGNORECASE)  # \x01 is BREAK
-PAGE_URL = re.compile(r"https?://[^\s/]+(/\S*)?", re.IGNORECASE)
 SLIDE_LINK = re.compile(r"#([0-9]+)")  # ASCII digits only, as deck.js reads the hash
 # Pixel counts take at most nine ASCII digits. str.isdigit() also passes digits such as "²", which
 # int() rejects, and int() refuses a string past its digit limit.
@@ -148,7 +148,7 @@ def parse(text: str, path: Path) -> Deck:
             )
         if key in FLAG_KEYS and value not in ("yes", "no"):
             raise _error(path, line, f"'{key}' must be yes or no, not '{value}'")
-        if key == "url" and not PAGE_URL.fullmatch(value):
+        if key == "url" and not _is_page_url(value):
             raise _error(
                 path,
                 line,
@@ -209,6 +209,20 @@ def _check_links(path: Path, slide: Slide, count: int) -> None:
                     f"slide {slide.number}: can't link to '{written}'; a link goes to an https:, http: or "
                     "mailto: address, or to a slide as #N",
                 )
+
+
+def _is_page_url(value: str) -> bool:
+    """Whether value is a full http:// or https:// address with a host. urlsplit, and reading the
+    port, raise ValueError on a malformed authority, such as an unclosed IPv6 bracket or a port
+    that isn't a number."""
+    if any(c.isspace() for c in value):
+        return False
+    try:
+        parts = urlsplit(value)
+        _ = parts.port
+    except ValueError:
+        return False
+    return parts.scheme in ("http", "https") and bool(parts.hostname)
 
 
 def _names_a_slide(digits: str, count: int) -> bool:

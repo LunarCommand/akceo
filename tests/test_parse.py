@@ -424,7 +424,9 @@ def test_image_frame_errors(source: str, message: str):
     assert message in str(e.value)
 
 
-@pytest.mark.parametrize("url", ["https://akceo.ai/", "https://akceo.ai", "HTTP://x.example/a/b?c=d#e"])
+@pytest.mark.parametrize(
+    "url", ["https://akceo.ai/", "https://akceo.ai", "HTTP://x.example/a/b?c=d#e", "https://x.example:8443/a"]
+)
 def test_a_page_url_is_a_full_address(url: str):
     assert deck(f"url: {url}\n---\n## A\n").config["url"] == url
 
@@ -438,6 +440,11 @@ def test_a_page_url_is_a_full_address(url: str):
         "https:///index.html",
         "ftp://x.example",
         "https://x.example/a b",
+        "https://?preview=1",
+        "https://#slide1",
+        "https://:443/",
+        "https://[::1",
+        "https://x.example:port/",
     ],
 )
 def test_a_page_url_must_be_a_full_address(url: str):
