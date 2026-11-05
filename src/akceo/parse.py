@@ -6,7 +6,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from akceo import files
-from akceo.errors import DeckError
+from akceo.errors import Code, DeckError
 
 LAYOUTS = ("title", "bullets", "split", "steps", "table", "image")
 DEFAULT_LAYOUT = "bullets"
@@ -108,6 +108,7 @@ class Deck:
     path: Path
     config: dict[str, str]
     slides: tuple[Slide, ...]
+    config_lines: dict[str, int] = field(default_factory=dict[str, int], compare=False)  # key: its line
 
     @property
     def title(self) -> str:
@@ -116,9 +117,6 @@ class Deck:
     def framed(self, slide: Slide) -> bool:
         """Whether the slide's image sits in a panel. The slide's image-frame wins over the deck's."""
         return slide.meta.get("image-frame", self.config.get("image-frame", "yes")) == "yes"
-
-    def error(self, slide: Slide, message: str) -> DeckError:
-        return _error(self.path, slide.line, f"slide {slide.number}: {message}")
 
     def has_links(self) -> bool:
         texts = (text for slide in self.slides for _, text in _slide_texts(slide))
@@ -136,28 +134,42 @@ def parse(text: str, path: Path) -> Deck:
     control = CONTROL.search(text)
     if control:
         line = text.count("\n", 0, control.start()) + 1
-        raise _error(path, line, f"a control character (U+{ord(control.group()):04X}) can't be in a deck")
+        raise DeckError(
+            "deck-control-character",
+            f"a control character (U+{ord(control.group()):04X}) can't be in a deck",
+            path,
+            line,
+        )
     chunks = _chunks(text)
     config_start, config_lines = chunks[0]
     entries, rest, _ = _split_header(config_start, config_lines)
     config: dict[str, str] = {}
+    key_lines: dict[str, int] = {}
     for line, key, value in entries:
         if key not in CONFIG_KEYS:
-            raise _error(
-                path, line, f"unknown config key '{key}' (expected one of: {', '.join(CONFIG_KEYS)})"
-            )
-        if key in FLAG_KEYS and value not in ("yes", "no"):
-            raise _error(path, line, f"'{key}' must be yes or no, not '{value}'")
-        if key == "url" and not _is_page_url(value):
-            raise _error(
+            raise DeckError(
+                "key-unknown",
+                f"unknown config key '{key}' (expected one of: {', '.join(CONFIG_KEYS)})",
                 path,
                 line,
+            )
+        if key in FLAG_KEYS and value not in ("yes", "no"):
+            raise DeckError("value-not-yes-or-no", f"'{key}' must be yes or no, not '{value}'", path, line)
+        if key == "url" and not _is_page_url(value):
+            raise DeckError(
+                "url-invalid",
                 f"'url' must be the page's full address, starting https:// or http://, not '{value}'",
+                path,
+                line,
             )
         config[key] = value
+        key_lines[key] = line
     if any(_has_content(line) for line in rest):
-        raise _error(
-            path, config_start, "the config block may only hold key: value lines; start each slide after ---"
+        raise DeckError(
+            "config-not-key-value",
+            "the config block may only hold key: value lines; start each slide after ---",
+            path,
+            config_start,
         )
 
     slides: list[Slide] = []
@@ -165,10 +177,10 @@ def parse(text: str, path: Path) -> Deck:
         if any(_has_content(line) for line in lines):
             slides.append(_slide(path, len(slides) + 1, start, lines))
     if not slides:
-        raise DeckError(f"{path}: the deck has no slides; start each slide after a --- line")
+        raise DeckError("deck-no-slides", "the deck has no slides; start each slide after a --- line", path)
     for slide in slides:
         _check_links(path, slide, len(slides))
-    return Deck(path, config, tuple(slides))
+    return Deck(path, config, tuple(slides), key_lines)
 
 
 def _slide_texts(slide: Slide) -> list[tuple[int, str]]:
@@ -197,17 +209,19 @@ def _check_links(path: Path, slide: Slide, count: int) -> None:
             written = text[m.start(2) : m.end(2)]
             if BREAK in url:
                 message = f"a link's URL can't continue onto the next line ('{written.replace(BREAK, '\\')}')"
-                raise _error(path, line, f"slide {slide.number}: {message}")
+                raise DeckError("link-split", message, path, line, slide.number)
             slide_link = SLIDE_LINK.fullmatch(url)
             if slide_link and not _names_a_slide(slide_link.group(1), count):
                 message = f"the link to {url} goes past the last slide, {count}"
-                raise _error(path, line, f"slide {slide.number}: {message}")
+                raise DeckError("link-past-last-slide", message, path, line, slide.number)
             if not slide_link and not OUTSIDE_LINK.fullmatch(url):
-                raise _error(
+                raise DeckError(
+                    "link-target-invalid",
+                    f"can't link to '{written}'; a link goes to an https:, http: or mailto: address, or to a "
+                    "slide as #N",
                     path,
                     line,
-                    f"slide {slide.number}: can't link to '{written}'; a link goes to an https:, http: or "
-                    "mailto: address, or to a slide as #N",
+                    slide.number,
                 )
 
 
@@ -231,10 +245,6 @@ def _names_a_slide(digits: str, count: int) -> bool:
     a billion slides."""
     significant = digits.lstrip("0") or "0"
     return len(significant) <= 9 and 1 <= int(significant) <= count
-
-
-def _error(path: Path, line: int, message: str) -> DeckError:
-    return DeckError(f"{path}:{line}: {message}")
 
 
 def _chunks(text: str) -> list[tuple[int, list[str]]]:
@@ -275,38 +285,39 @@ def _split_header(start: int, lines: list[str]) -> tuple[list[Entry], list[str],
 def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
     entries, body, first = _split_header(start, lines)
 
-    def fail(message: str, line: int = first) -> DeckError:
-        return _error(path, line, f"slide {number}: {message}")
+    def fail(code: Code, message: str, line: int = first) -> DeckError:
+        return DeckError(code, message, path, line, number)
 
     meta = {key: value for _, key, value in entries}
     layout = meta.get("layout", DEFAULT_LAYOUT)
     if layout not in LAYOUTS:
-        raise fail(f"unknown layout '{layout}' (expected one of: {', '.join(LAYOUTS)})")
+        raise fail("layout-unknown", f"unknown layout '{layout}' (expected one of: {', '.join(LAYOUTS)})")
 
     for line, key, value in entries:
         owners = [name for name, keys in LAYOUT_KEYS.items() if key in keys]
         if key not in COMMON_KEYS and not owners:
-            raise fail(f"unknown key '{key}'", line)
+            raise fail("key-unknown", f"unknown key '{key}'", line)
         if owners and layout not in owners:
             noun = "layout" if len(owners) == 1 else "layouts"
-            raise fail(f"'{key}' only applies to the {_join(owners)} {noun}", line)
+            raise fail("key-wrong-layout", f"'{key}' only applies to the {_join(owners)} {noun}", line)
         if key in FLAG_KEYS and value not in ("yes", "no"):
-            raise fail(f"'{key}' must be yes or no, not '{value}'", line)
+            raise fail("value-not-yes-or-no", f"'{key}' must be yes or no, not '{value}'", line)
         if key == "image-max":
             try:
                 pixel_count(value, key)
             except DeckError as e:
-                raise fail(str(e), line) from None
+                raise e.within(path, line, number) from None
         if key == "image-crop":
             try:
                 crop_box(value, key)
             except DeckError as e:
-                raise fail(str(e), line) from None
+                raise e.within(path, line, number) from None
             image = meta.get("image", "")
             if image.lower().endswith((".svg", ".mmd")):
-                raise fail(f"'image-crop' only works on PNG, JPEG and WebP images, not {image}", line)
+                message = f"'image-crop' only works on PNG, JPEG and WebP images, not {image}"
+                raise fail("image-option-unsupported", message, line)
         if key in STYLE_KEYS and STYLE_URL.search(value):
-            raise fail(f"'{key}' can't reference files or URLs (url() or image-set())", line)
+            raise fail("style-url", f"'{key}' can't reference files or URLs (url() or image-set())", line)
 
     blocks = _blocks(*_logical_lines(body, start + len(lines) - len(body)))
     allowed = LAYOUT_BLOCKS[layout]
@@ -315,13 +326,16 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
         name = BLOCK_NAMES[block.kind]
         if block.kind not in allowed:
             takes = _join([BLOCK_NAMES[kind] for kind in allowed]) if allowed else "no content"
-            raise fail(f"{name} isn't used by the {layout} layout, which takes {takes}", block.line)
+            message = f"{name} isn't used by the {layout} layout, which takes {takes}"
+            raise fail("block-not-in-layout", message, block.line)
         if block.kind in seen and not allowed[block.kind]:
-            raise fail(f"the {layout} layout takes only one {name.split(' ', 1)[1]}", block.line)
+            raise fail(
+                "block-repeated", f"the {layout} layout takes only one {name.split(' ', 1)[1]}", block.line
+            )
         seen.add(block.kind)
     for kind in REQUIRED_BLOCKS[layout]:
         if kind not in seen:
-            raise fail(f"the {layout} layout needs {BLOCK_NAMES[kind]}")
+            raise fail("block-missing", f"the {layout} layout needs {BLOCK_NAMES[kind]}")
 
     return Slide(number, first, meta, tuple(blocks))
 
@@ -331,7 +345,8 @@ def pixel_count(value: str, key: str) -> int:
     came from."""
     if not (PIXELS.fullmatch(value) and int(value) > 0):
         raise DeckError(
-            f"'{key}' must be a positive whole number of pixels, at most nine digits 0-9, not '{value}'"
+            "value-not-pixels",
+            f"'{key}' must be a positive whole number of pixels, at most nine digits 0-9, not '{value}'",
         )
     return int(value)
 
@@ -342,12 +357,15 @@ def crop_box(value: str, key: str) -> tuple[int, int, int, int]:
     m = CROP.fullmatch(value.strip())
     if not m:
         raise DeckError(
+            "crop-invalid",
             f"'{key}' must be four whole numbers of pixels, left, top, right and bottom, each at most nine "
-            f"digits 0-9, such as 120, 80, 920, 580, not '{value}'"
+            f"digits 0-9, such as 120, 80, 920, 580, not '{value}'",
         )
     left, top, right, bottom = map(int, m.groups())
     if right <= left or bottom <= top:
-        raise DeckError(f"'{key}' {value} is empty: right must be past left, and bottom below top")
+        raise DeckError(
+            "crop-empty", f"'{key}' {value} is empty: right must be past left, and bottom below top"
+        )
     return left, top, right, bottom
 
 

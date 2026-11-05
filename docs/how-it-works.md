@@ -188,7 +188,8 @@ sequenceDiagram
   vendored in `assets/vendor/mermaid/`. Nothing needs installing outside Python. The page uses
   plain JavaScript with no framework, plus Mermaid when the deck has a diagram.
 - **Fail loudly and precisely.** Input is checked before anything is written. Every error names
-  the file it's about, and errors in the deck also give the line and slide.
+  the file it's about, and errors in the deck also give the line and slide. Each also has a code
+  that never changes, which `check --json` reports, so an agent can act on it.
 - **Content and look are separate.** The deck says what's on each slide; the theme alone decides
   colors and fonts.
 
@@ -197,6 +198,8 @@ sequenceDiagram
 ```mermaid
 flowchart TD
     cli["cli.py<br/>akceo build / check / themes / viewer / docs / init"] --> render["render.py<br/>build()"]
+    cli --> report["report.py<br/>check()"]
+    report --> render
     render --> parse["parse.py<br/>load(), validation"]
     parse --> files["files.py<br/>read_text()"]
     render --> themes["themes.py<br/>load(), token check"]
@@ -223,7 +226,8 @@ flowchart TD
 
 | Module | Job |
 | --- | --- |
-| `cli.py` | Parses arguments, runs a command, writes the output, turns `DeckError` into a message and exit code 1. `check` runs the build and writes nothing. `docs` prints the guide for agents, and `init` points to it from a folder's `AGENTS.md` and `CLAUDE.md`. |
+| `cli.py` | Parses arguments, runs a command, writes the output, turns `DeckError` into a message and exit code 1. `check` runs the build and writes nothing, and `check --json` prints what `report.py` returns. `docs` prints the guide for agents, and `init` points to it from a folder's `AGENTS.md` and `CLAUDE.md`. |
+| `report.py` | Runs the checks and returns the result as data, with the error's code and where it is: what `check --json` prints |
 | `render.py` | Runs the build: loads the deck and theme, embeds images, checks diagrams, renders each slide, fills the page template |
 | `parse.py` | Turns Markdown into a validated `Deck`. All input rules live here, except those that need the image itself, such as a crop past its edge, which `images.py` checks. |
 | `themes.py` | Finds a theme by name or path, checks that it sets every token, and reads the token values that Mermaid diagrams use |
@@ -232,7 +236,7 @@ flowchart TD
 | `shape_data.py` | Reads the `@{…}` shape data in a diagram the way Mermaid does, keeping where each value is, so the inlining can replace a value in place and the check can name its line |
 | `mermaid.py` | Checks each `.mmd` diagram with Mermaid's parser in V8 and reports each node's image as Mermaid reads it, builds the theme's Mermaid config, and packs the vendored script for the page, with its license notices |
 | `files.py` | Checks for and reads user files, turning read and decode failures into `DeckError` |
-| `errors.py` | `DeckError`, the one exception type the CLI reports to the user |
+| `errors.py` | `DeckError`, the one exception type the CLI reports to the user. It carries a code from `CODES` and the places it's about, from the outside in, such as a slide and then a line in that slide's diagram |
 
 ### The build pipeline
 
@@ -307,7 +311,6 @@ classDiagram
         config: dict
         slides: tuple~Slide~
         title()
-        error(slide, message)
     }
     class Slide {
         number: int

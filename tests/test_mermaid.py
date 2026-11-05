@@ -248,6 +248,7 @@ def test_a_diagram_too_long_with_its_images_inlined_names_them(checker: Checker,
         f"{noise.size:,}, small.png (line 2) {small.size:,}. Crop or shrink an image with #crop= or #max= "
         "after its path, or split the diagram"
     )
+    assert e.value.code == "diagram-too-long"
 
 
 @pytest.mark.parametrize(
@@ -285,8 +286,9 @@ def test_a_diagram_that_hangs_mermaid_stops_the_build(monkeypatch: pytest.Monkey
     fake_worker(monkeypatch, READY + "sys.stdin.readline(); time.sleep(60)")
     monkeypatch.setattr(mermaid, "PARSE_TIMEOUT", 0.5)
     checker = Checker()
-    with pytest.raises(DeckError, match=r"^flow\.mmd: Mermaid took over 0\.5s to check the diagram$"):
+    with pytest.raises(DeckError, match=r"^flow\.mmd: Mermaid took over 0\.5s to check the diagram$") as e:
         checker.check(FLOW, "flowchart LR\n")
+    assert e.value.code == "diagram-timeout"
     assert checker._worker is None  # pyright: ignore[reportPrivateUsage]
 
 

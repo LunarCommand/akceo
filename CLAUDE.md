@@ -19,6 +19,10 @@ dependencies are Pillow (images) and mini-racer (V8, to check Mermaid diagrams a
 - `src/akceo/themes.py`: theme lookup and the token check.
 - `src/akceo/files.py`: checks for and reads user-supplied files, turning read failures into
   `DeckError`.
+- `src/akceo/errors.py`: `DeckError` and its codes. Agents branch on a code, so one is never
+  renamed or reused; `docs/syntax.md` lists them, and a test keeps the two the same.
+- `src/akceo/report.py`: what `akceo check --json` prints, as data. A field may be added, never
+  renamed or removed.
 - `src/akceo/cli.py`: the `akceo` command.
 - `src/akceo/assets/`: the page template, `base.css` (layout rules; all colors and fonts come from
   theme tokens), `deck.js` (navigation), `diagrams.js` (unpacks Mermaid and draws the diagrams),

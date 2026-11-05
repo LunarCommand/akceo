@@ -18,9 +18,11 @@ def read_text(path: Path, what: str, newline: str | None = None) -> str:
         with path.open(encoding="utf-8", newline=newline) as f:
             return f.read()
     except FileNotFoundError:
-        raise DeckError(f"{path}: no such file") from None
+        raise DeckError("file-not-found", "no such file", path) from None
     except UnicodeDecodeError as e:
         line = e.object[: e.start].count(b"\n") + 1
-        raise DeckError(f"{path}:{line}: not valid UTF-8 text; save the {what} as UTF-8") from None
+        raise DeckError(
+            "file-not-utf8", f"not valid UTF-8 text; save the {what} as UTF-8", path, line
+        ) from None
     except OSError as e:
-        raise DeckError(f"{path}: {e.strerror or e}") from None
+        raise DeckError("file-unreadable", str(e.strerror or e), path) from None

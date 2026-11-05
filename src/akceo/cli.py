@@ -1,13 +1,14 @@
 """The akceo command line."""
 
 import argparse
+import json
 import os
 import sys
 from collections.abc import Sequence
 from importlib.metadata import version
 from pathlib import Path
 
-from akceo import files, render, themes
+from akceo import files, render, report, themes
 from akceo.errors import DeckError
 
 VIEWER = "md-viewer.html"
@@ -35,6 +36,7 @@ def _parser() -> argparse.ArgumentParser:
     check = commands.add_parser("check", help="check a deck, diagrams included, without writing a file")
     check.add_argument("deck", type=Path, help="the deck's Markdown file")
     check.add_argument("-t", "--theme", help="built-in theme name or path to a .css file (overrides theme:)")
+    check.add_argument("--json", action="store_true", help="print the result as JSON, for agents and scripts")
 
     commands.add_parser("themes", help="list the built-in themes")
 
@@ -64,7 +66,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "build":
             _build(args.deck, args.out, args.theme)
         elif args.command == "check":
-            _check(args.deck, args.theme)
+            return _check(args.deck, args.theme, args.json)
         elif args.command == "viewer":
             _write_viewer(args.out)
         elif args.command == "docs":
@@ -90,10 +92,15 @@ def _build(deck: Path, out: Path | None, theme: str | None) -> None:
     print(f"wrote {out} ({out.stat().st_size / 1024:.0f} KB, {count} {noun})")
 
 
-def _check(deck: Path, theme: str | None) -> None:
+def _check(deck: Path, theme: str | None, as_json: bool) -> int:
+    if as_json:
+        result = report.check(deck, theme)
+        print(json.dumps(result, indent=2))
+        return 0 if result["ok"] else 1
     _, count = render.build(deck, theme)
     noun = "slide" if count == 1 else "slides"
     print(f"ok: {deck} ({count} {noun})")
+    return 0
 
 
 def _write_viewer(out: Path) -> None:
@@ -115,7 +122,7 @@ def _init(folder: Path, dry_run: bool) -> None:
     file that's missing. A file that has the section already is left as it is. Every file is read
     before any is written, so a problem with one leaves both unchanged."""
     if not os.path.isdir(folder):
-        raise DeckError(f"{folder}: not a folder")
+        raise DeckError("init-not-folder", "not a folder", folder)
     section = (render.ASSETS / "init-block.md").read_text(encoding="utf-8")
     plan: list[tuple[Path, str, str]] = []  # (path, mode, text); with no mode, text is only reported
     targets: dict[Path, Path] = {}
@@ -123,13 +130,14 @@ def _init(folder: Path, dry_run: bool) -> None:
         path = folder / name
         target = Path(os.path.realpath(path))
         if not target.is_relative_to(os.path.realpath(folder)):
-            raise DeckError(f"{path} links to {target}, outside {folder}; akceo init writes only inside it")
+            message = f"{path} links to {target}, outside {folder}; akceo init writes only inside it"
+            raise DeckError("init-link-outside", message)
         if target in targets:
             plan.append((path, "", f"{path} is the same file as {targets[target]}"))
             continue
         targets[target] = path
         if os.path.islink(path) and not os.path.exists(path):
-            raise DeckError(f"{path} links to {target}, which doesn't exist")
+            raise DeckError("init-broken-link", f"{path} links to {target}, which doesn't exist")
         if not os.path.lexists(path):
             plan.append((path, "x", section))
             continue
@@ -163,14 +171,14 @@ def _write_section(path: Path, mode: str, text: str) -> None:
         with path.open(mode, encoding="utf-8", newline="") as f:
             f.write(text)
     except OSError as e:
-        raise DeckError(f"{path}: {e.strerror}") from None
+        raise DeckError("file-unwritable", str(e.strerror), path) from None
 
 
 def _write(out: Path, text: str) -> None:
     try:
         out.write_text(text, encoding="utf-8")
     except OSError as e:
-        raise DeckError(f"{out}: {e.strerror}") from None
+        raise DeckError("file-unwritable", str(e.strerror), out) from None
 
 
 def _list_themes() -> None:

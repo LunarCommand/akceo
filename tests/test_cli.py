@@ -214,7 +214,7 @@ def test_a_theme_needs_the_link_tokens_only_for_a_deck_with_links(
     deck.write_text("theme: old.css\n---\n## A\n\n- see [the docs](https://x.example)\n")
     assert main(["build", str(deck)]) == 1
     assert capsys.readouterr().err == (
-        f"akceo: {deck}: theme old.css doesn't set --link-hover, --link-underline, which the deck's "
+        f"akceo: {deck}:1: theme old.css doesn't set --link-hover, --link-underline, which the deck's "
         "links need\n"
     )
 
@@ -362,14 +362,14 @@ def test_icon_errors_name_the_deck(tmp_path: Path, capsys: pytest.CaptureFixture
     deck = tmp_path / "deck.md"
     deck.write_text("icon: gone.png\n---\n## One\n")
     assert main(["check", str(deck)]) == 1
-    assert capsys.readouterr().err == f"akceo: {deck}: icon: image not found: {tmp_path / 'gone.png'}\n"
+    assert capsys.readouterr().err == f"akceo: {deck}:1: icon: image not found: {tmp_path / 'gone.png'}\n"
 
 
 def test_bad_theme_in_deck_names_the_deck(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     deck = tmp_path / "deck.md"
     deck.write_text("theme: neon\n---\n## One\n")
     assert main(["build", str(deck)]) == 1
-    assert capsys.readouterr().err.startswith(f"akceo: {deck}: unknown theme 'neon'")
+    assert capsys.readouterr().err.startswith(f"akceo: {deck}:1: unknown theme 'neon'")
 
 
 def test_themes_command(capsys: pytest.CaptureFixture[str]):

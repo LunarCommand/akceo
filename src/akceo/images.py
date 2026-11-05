@@ -21,17 +21,18 @@ def data_uri(
     if given, then shrunk to fit max_size (width, height) if given, keeping their shape. SVG is
     embedded as-is. Mermaid .mmd diagrams don't come here; the page draws them (see akceo.mermaid)."""
     if not files.is_file(path):
-        raise DeckError(f"image not found: {path}")
+        raise DeckError("file-not-found", f"image not found: {path}")
     try:
         if path.suffix.lower() == ".svg":
             if crop:
-                raise DeckError(f"can't crop an SVG image: {path}")
+                raise DeckError("image-option-unsupported", f"can't crop an SVG image: {path}")
             return _uri("image/svg+xml", path.read_bytes())
         with Image.open(path) as opened:
             fmt = opened.format or ""
             if fmt not in MIME:
                 raise DeckError(
-                    f"unsupported image format {fmt or 'unknown'}: {path} (use PNG, JPEG, WebP, SVG or .mmd)"
+                    "image-format-unsupported",
+                    f"unsupported image format {fmt or 'unknown'}: {path} (use PNG, JPEG, WebP, SVG or .mmd)",
                 )
             image = ImageOps.exif_transpose(opened)
             if crop:
@@ -41,13 +42,15 @@ def data_uri(
             buf = io.BytesIO()
             image.save(buf, format=fmt, **SAVE_OPTIONS[fmt])
     except UnidentifiedImageError:
-        raise DeckError(f"not a readable image: {path}") from None
+        raise DeckError("image-damaged", f"not a readable image: {path}") from None
     except OSError as e:
-        raise DeckError(f"can't read image {path}: {e.strerror or e}") from None
+        raise DeckError("file-unreadable", f"can't read image {path}: {e.strerror or e}") from None
+    except Image.DecompressionBombError as e:
+        raise DeckError("image-too-large", f"can't process image {path}: {e}") from None
     # Pillow reports some damaged or unsupported images with these rather than OSError: EXIF that
-    # isn't TIFF (SyntaxError), a mode thumbnail() can't reduce (ValueError), a huge declared size.
-    except (ValueError, SyntaxError, Image.DecompressionBombError) as e:
-        raise DeckError(f"can't process image {path}: {e}") from None
+    # isn't TIFF (SyntaxError), a mode thumbnail() can't reduce (ValueError).
+    except (ValueError, SyntaxError) as e:
+        raise DeckError("image-damaged", f"can't process image {path}: {e}") from None
     return _uri(MIME[fmt], buf.getvalue())
 
 
@@ -61,7 +64,10 @@ def _crop(
         size = f"{width} by {height} pixels"
         if (width, height) != stored:
             size += f" once turned upright (stored as {stored[0]} by {stored[1]})"
-        raise DeckError(f"the crop {', '.join(map(str, box))} goes past the edge of {path}, which is {size}")
+        raise DeckError(
+            "crop-past-edge",
+            f"the crop {', '.join(map(str, box))} goes past the edge of {path}, which is {size}",
+        )
     return image.crop(box)
 
 
