@@ -32,6 +32,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- An error about a slide's content, or about a link in it, names the line where that block
+  starts, not the slide's first line.
 - `image-max` takes a whole number of at most nine digits 0-9. Other digits, such as full-width
   ones, and longer numbers used to be accepted and now stop the build.
 
