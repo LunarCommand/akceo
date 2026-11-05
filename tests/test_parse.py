@@ -425,6 +425,37 @@ def test_image_frame_errors(source: str, message: str):
 
 
 @pytest.mark.parametrize(
+    "url", ["https://akceo.ai/", "https://akceo.ai", "HTTP://x.example/a/b?c=d#e", "https://x.example:8443/a"]
+)
+def test_a_page_url_is_a_full_address(url: str):
+    assert deck(f"url: {url}\n---\n## A\n").config["url"] == url
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "akceo.ai",
+        "/index.html",
+        "https://",
+        "https:///index.html",
+        "ftp://x.example",
+        "https://x.example/a b",
+        "https://?preview=1",
+        "https://#slide1",
+        "https://:443/",
+        "https://[::1",
+        "https://x.example:port/",
+    ],
+)
+def test_a_page_url_must_be_a_full_address(url: str):
+    with pytest.raises(DeckError) as e:
+        parse(f"title: T\nurl: {url}\n---\n## A\n", Path("deck.md"))
+    assert str(e.value) == (
+        f"deck.md:2: 'url' must be the page's full address, starting https:// or http://, not '{url}'"
+    )
+
+
+@pytest.mark.parametrize(
     "line",
     [
         "- [docs](https://x.example/guide)",
