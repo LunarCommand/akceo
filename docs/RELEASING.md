@@ -38,6 +38,8 @@ that version's section of `CHANGELOG.md`.
    - `CHANGELOG.md`: rename `## [Unreleased]` to `## [0.2.0] - YYYY-MM-DD` with the date you'll tag
      on, and add a new empty `## [Unreleased]` above it.
    - Run `uv lock`, so `uv.lock` records the new version.
+   - Run `uv run python scripts/build_guide.py`, so the guide for agents names the new
+     version.
 
 4. **Review what's about to ship.** Before merging, look at the full change since the last
    release (`git diff <last tag>..HEAD`) next to the new changelog section. Then merge to `main`.

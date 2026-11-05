@@ -25,9 +25,9 @@ kicker: Agenda
 - Second thing
 ```
 
-Mistakes stop the build with a message that names the file, the line and the slide. Examples
-are an unknown key, a key on the wrong layout, a missing heading, or content the layout doesn't
-use.
+Mistakes stop the build with a message that names the file, the slide and a line: the key's
+own line when a key is wrong, or else the line where the slide starts. Examples are an unknown
+key, a key on the wrong layout, a missing heading, or content the layout doesn't use.
 
 ## Config block
 
@@ -43,6 +43,10 @@ The config block is everything before the first `---`. It may hold only `key: va
 ## Slides
 
 A slide starts with `key: value` header lines. Then comes a blank line, then the content.
+
+Keys are lowercase. They end at the first line that isn't a key or an [author
+note](#author-notes), so a key written after the blank line, or in capitals, such as `Kicker:`,
+shows on the slide as text.
 
 ### Slide keys
 
@@ -71,9 +75,11 @@ A slide starts with `key: value` header lines. Then comes a blank line, then the
 | `table` | A table | `##` heading, `\|` table | `##` heading, `\|` table |
 | `image` | An image filling the slide, with an optional heading above it and caption below it | `##` heading, paragraph | nothing |
 
-Each kind of content may appear once per slide. In the `split` layout, phases and lists may
-repeat and render in the order written. There, the note always renders last. In the `image`
-layout, the paragraph is a caption: smaller muted text, centered under the image.
+Each kind of content may appear once per slide. A layout shows its content in the order of the
+Takes column, whatever order the slide gives it in: in `bullets`, a paragraph written above the
+list still shows below it. In the `split` layout, phases and lists may repeat and render in the
+order written. There, the note always renders last. In the `image` layout, the paragraph is a
+caption: smaller muted text, centered under the image.
 
 ## Blocks
 
@@ -137,6 +143,10 @@ A link goes to one of these, and anything else stops the build:
 A URL can't contain a space, a quote or `)`. Write `%20` for a space and `%29` for `)`. The
 link text can't contain `]`; a link written with one shows as plain text.
 Clicking a link follows it without changing the slide.
+
+`#N` counts the slides on the page. A slide that holds only [author notes](#author-notes) is
+skipped and doesn't count, so when you fill one in, every slide after it is numbered one higher.
+Check the `#N` links to those slides.
 
 ## Images
 

@@ -1,15 +1,23 @@
 """The akceo command line."""
 
 import argparse
+import os
 import sys
 from collections.abc import Sequence
 from importlib.metadata import version
 from pathlib import Path
 
-from akceo import render, themes
+from akceo import files, render, themes
 from akceo.errors import DeckError
 
 VIEWER = "md-viewer.html"
+GUIDE = Path(__file__).with_name("guide.md")
+INIT_MARKER = "<!-- akceo-init -->"
+INIT_FILES = ("AGENTS.md", "CLAUDE.md")
+INIT_VERBS = {
+    "x": ("wrote", "would write"),
+    "a": ("added the akceo section to", "would add the akceo section to"),
+}
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -36,6 +44,17 @@ def _parser() -> argparse.ArgumentParser:
     viewer.add_argument(
         "-o", "--out", type=Path, default=Path(VIEWER), help=f"output file or folder (default: ./{VIEWER})"
     )
+
+    docs = commands.add_parser("docs", help="print where the guide to writing decks is, for AI agents")
+    docs.add_argument("--print", action="store_true", dest="text", help="print the guide itself")
+
+    init = commands.add_parser(
+        "init", help="add a section that points AI agents to the guide to AGENTS.md and CLAUDE.md"
+    )
+    init.add_argument(
+        "folder", type=Path, nargs="?", default=Path("."), help="the folder the decks are in (default: .)"
+    )
+    init.add_argument("--dry-run", action="store_true", help="say what would change, and change nothing")
     return parser
 
 
@@ -48,6 +67,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             _check(args.deck, args.theme)
         elif args.command == "viewer":
             _write_viewer(args.out)
+        elif args.command == "docs":
+            _docs(args.text)
+        elif args.command == "init":
+            _init(args.folder, args.dry_run)
         else:
             _list_themes()
     except DeckError as e:
@@ -78,6 +101,69 @@ def _write_viewer(out: Path) -> None:
         out = out / VIEWER
     _write(out, (render.ASSETS / VIEWER).read_text(encoding="utf-8"))
     print(f"wrote {out}")
+
+
+def _docs(text: bool) -> None:
+    if text:
+        print(GUIDE.read_text(encoding="utf-8"), end="")
+    else:
+        print(GUIDE)
+
+
+def _init(folder: Path, dry_run: bool) -> None:
+    """Append the section that points agents to the guide to each of INIT_FILES in folder, creating a
+    file that's missing. A file that has the section already is left as it is. Every file is read
+    before any is written, so a problem with one leaves both unchanged."""
+    if not os.path.isdir(folder):
+        raise DeckError(f"{folder}: not a folder")
+    section = (render.ASSETS / "init-block.md").read_text(encoding="utf-8")
+    plan: list[tuple[Path, str, str]] = []  # (path, mode, text); with no mode, text is only reported
+    targets: dict[Path, Path] = {}
+    for name in INIT_FILES:
+        path = folder / name
+        target = Path(os.path.realpath(path))
+        if not target.is_relative_to(os.path.realpath(folder)):
+            raise DeckError(f"{path} links to {target}, outside {folder}; akceo init writes only inside it")
+        if target in targets:
+            plan.append((path, "", f"{path} is the same file as {targets[target]}"))
+            continue
+        targets[target] = path
+        if os.path.islink(path) and not os.path.exists(path):
+            raise DeckError(f"{path} links to {target}, which doesn't exist")
+        if not os.path.lexists(path):
+            plan.append((path, "x", section))
+            continue
+        existing = files.read_text(path, "file", newline="")
+        if INIT_MARKER in existing:
+            plan.append((path, "", f"{path} already has the akceo section"))
+            continue
+        newline = "\r\n" if "\r\n" in existing else "\n"
+        plan.append((path, "a", _gap(existing, newline) + section.replace("\n", newline)))
+    for path, mode, text in plan:
+        if not mode:
+            print(text)
+            continue
+        if not dry_run:
+            _write_section(path, mode, text)
+        done, would = INIT_VERBS[mode]
+        print(f"{would if dry_run else done} {path}")
+    print("next: run akceo docs --print and read the guide before writing a deck")
+
+
+def _gap(existing: str, newline: str) -> str:
+    """What goes between a file's text and the section appended to it, to leave one blank line."""
+    if not existing.strip() or existing.endswith(newline * 2):
+        return ""
+    return newline if existing.endswith(newline) else newline * 2
+
+
+def _write_section(path: Path, mode: str, text: str) -> None:
+    """Create path ("x") or append to it ("a"), leaving whatever it already holds as it was."""
+    try:
+        with path.open(mode, encoding="utf-8", newline="") as f:
+            f.write(text)
+    except OSError as e:
+        raise DeckError(f"{path}: {e.strerror}") from None
 
 
 def _write(out: Path, text: str) -> None:
