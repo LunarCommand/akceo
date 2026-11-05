@@ -32,13 +32,15 @@ def build(deck_path: Path, theme: str | None = None) -> tuple[str, int]:
         try:
             theme_css = themes.load(deck.config.get("theme", themes.DEFAULT), deck_path.parent)
         except DeckError as e:
-            raise DeckError(f"{deck_path}: {e}") from None
+            raise e.within(deck_path, deck.config_lines.get("theme")) from None
     unset = themes.missing(theme_css, themes.LINK_TOKENS) if deck.has_links() else []
     if unset:
         name = theme if theme is not None else deck.config.get("theme", themes.DEFAULT)
         raise DeckError(
-            f"{deck_path}: theme {name} doesn't set {', '.join('--' + t for t in unset)}, which the "
-            "deck's links need"
+            "theme-missing-tokens",
+            f"theme {name} doesn't set {', '.join('--' + t for t in unset)}, which the deck's links need",
+            deck_path,
+            None if theme is not None else deck.config_lines.get("theme"),
         )
     images_dir = deck_path.parent / Path(deck.config.get("images", ".")).expanduser()
 
@@ -82,7 +84,7 @@ def _head(deck: Deck) -> str:
         try:
             src = images.data_uri(deck.path.parent / Path(icon).expanduser(), (ICON_MAX, ICON_MAX))
         except DeckError as e:
-            raise DeckError(f"{deck.path}: icon: {e}") from None
+            raise DeckError(e.code, f"icon: {e}", deck.path, deck.config_lines.get("icon")) from None
         tags.append(f'<link rel="icon" href="{src}">')
     return "".join("\n" + tag for tag in tags)
 
@@ -104,7 +106,7 @@ def _image_src(deck: Deck, slide: Slide, images_dir: Path) -> str:
         crop = parse.crop_box(slide.meta["image-crop"], "image-crop") if "image-crop" in slide.meta else None
         return images.data_uri(images_dir / slide.meta["image"], (max_px, max_px), crop)
     except DeckError as e:
-        raise deck.error(slide, str(e)) from None
+        raise e.within(deck.path, slide.line, slide.number) from None
 
 
 def _diagram(deck: Deck, slide: Slide, images_dir: Path, checker: mermaid.Checker) -> str:
@@ -114,12 +116,12 @@ def _diagram(deck: Deck, slide: Slide, images_dir: Path, checker: mermaid.Checke
     path = images_dir / slide.meta["image"]
     try:
         if not files.is_file(path):
-            raise DeckError(f"image not found: {path}")
+            raise DeckError("file-not-found", f"image not found: {path}")
         source = files.read_text(path, "diagram")
         source, inlined = diagram_images.inline(path, source, checker.images(path, source))
         checker.check(path, source, inlined)
     except DeckError as e:
-        raise deck.error(slide, str(e)) from None
+        raise e.within(deck.path, slide.line, slide.number) from None
     return source
 
 

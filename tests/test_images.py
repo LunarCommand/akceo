@@ -64,8 +64,9 @@ def test_truncated_png(tmp_path: Path):
     buf = io.BytesIO()
     noise.save(buf, format="PNG")
     (tmp_path / "a.png").write_bytes(buf.getvalue()[: len(buf.getvalue()) // 2])
-    with pytest.raises(DeckError, match="can't read image .*a.png: image file is truncated"):
+    with pytest.raises(DeckError, match="can't read image .*a.png: image file is truncated") as e:
         data_uri(tmp_path / "a.png", (100, 100))
+    assert e.value.code == "image-damaged"
 
 
 def test_svg_read_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

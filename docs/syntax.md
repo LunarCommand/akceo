@@ -330,3 +330,53 @@ A comment on a theme's first line is its description in `akceo themes`. The page
 Content-Security-Policy stops it loading anything from outside, so a web font or an `@import` in a
 theme never shows. Use fonts installed on the machine you present from, or embed one as a
 `data:` URI in an `@font-face` rule.
+
+## Error codes
+
+`akceo check` stops at the first problem and names its file, line and slide. Each problem also
+has a code, which `akceo check --json` reports, so an agent can act on the kind of problem without
+reading the message. A code is never renamed or reused.
+
+| Code | Raised when |
+| --- | --- |
+| `file-not-found` | The deck, a theme, an image, the icon or a diagram doesn't exist |
+| `file-unreadable` | A file exists but can't be read, such as when permission is denied |
+| `file-not-utf8` | The deck, a theme or a diagram isn't UTF-8 text |
+| `file-unwritable` | The built page, the viewer or a file `akceo init` writes can't be written |
+| `deck-control-character` | The deck has a control character in it |
+| `deck-no-slides` | The deck has no slides |
+| `config-not-key-value` | A line in the config block isn't `key: value` |
+| `key-unknown` | A config key or slide key akceo doesn't know |
+| `layout-unknown` | A `layout:` that isn't one of the six |
+| `key-wrong-layout` | A slide key that only works with other layouts |
+| `value-not-yes-or-no` | A yes-or-no key with another value |
+| `value-not-pixels` | `image-max`, or `max=` in a diagram's `img:`, isn't a positive whole number |
+| `crop-invalid` | `image-crop`, or `crop=` in a diagram's `img:`, isn't four whole numbers |
+| `crop-empty` | A crop that keeps nothing |
+| `crop-past-edge` | A crop past the image's edge |
+| `image-option-unsupported` | A crop or `max=` on an SVG image, or `image-crop` on a diagram |
+| `url-invalid` | `url:` isn't a full `https://` or `http://` address |
+| `style-url` | A `style-…` key uses `url()` or `image-set()` |
+| `block-not-in-layout` | Content the slide's layout doesn't take |
+| `block-repeated` | A second block of a kind the layout takes only once |
+| `block-missing` | A block the layout needs, such as the `##` heading |
+| `link-split` | A link's URL runs onto the next line |
+| `link-past-last-slide` | A `#N` link past the last slide |
+| `link-target-invalid` | A link that isn't to `https:`, `http:`, `mailto:` or `#N` |
+| `image-format-unsupported` | An image that isn't PNG, JPEG, WebP or SVG, such as a GIF |
+| `image-damaged` | An image file that can't be decoded |
+| `image-too-large` | An image over Pillow's size limit, about 179 million pixels; shrink it |
+| `diagram-syntax` | Mermaid can't parse the diagram |
+| `diagram-too-long` | A diagram over Mermaid's size limit |
+| `diagram-loads-outside` | A diagram that loads or links to anything outside the deck |
+| `diagram-timeout` | Mermaid took too long to check the diagram |
+| `img-unlocated` | akceo can't tell where a node's `img:` is written in the diagram |
+| `img-no-path` | An `img:` that starts with `#` |
+| `img-unquoted` | An `img:` with options that isn't in quotes |
+| `img-option-invalid` | An `img:` option that's unknown or given twice |
+| `theme-unknown` | A theme name that isn't built in |
+| `theme-closes-style` | A theme with `</style` in it |
+| `theme-missing-tokens` | A theme that leaves out a token it needs, including the link tokens for a deck with links |
+| `init-not-folder` | `akceo init` was given something that isn't a folder |
+| `init-link-outside` | `AGENTS.md` or `CLAUDE.md` links to a file outside the folder |
+| `init-broken-link` | `AGENTS.md` or `CLAUDE.md` links to a file that doesn't exist |

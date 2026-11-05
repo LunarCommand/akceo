@@ -32,11 +32,16 @@ All notable changes to this project are documented here. The format follows
 - Three config keys for a deck published on the web: `description:` and `url:` add the tags
   that search engines and link previews read, and `icon:` builds an image into the page as its
   browser-tab icon. A `url:` that isn't a full `https://` or `http://` address stops the build.
+- `akceo check --json` prints the result as JSON, for agents and scripts: whether the deck is
+  fine, how many slides it has, or the problem with its file, line and slide. Every kind of problem
+  has a code that never changes, such as `block-missing` or `diagram-syntax`, listed in
+  `docs/syntax.md`.
 
 ### Changed
 
 - An error about a slide's content, or about a link in it, names the line where that block
   starts, not the slide's first line.
+- An error about the deck's `theme:` or `icon:` names that key's line in the config block.
 - `image-max` takes a whole number of at most nine digits 0-9. Other digits, such as full-width
   ones, and longer numbers used to be accepted and now stop the build.
 
