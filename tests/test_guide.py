@@ -1,4 +1,4 @@
-"""The packaged guide, src/akceo/AGENTS.md, is what scripts/build_agents_md.py writes."""
+"""The packaged guide, src/akceo/guide.md, is what scripts/build_guide.py writes."""
 
 import importlib.util
 from pathlib import Path
@@ -7,13 +7,13 @@ from typing import Any
 import pytest
 
 ROOT = Path(__file__).parents[1]
-SCRIPT = ROOT / "scripts" / "build_agents_md.py"
-GUIDE = ROOT / "src" / "akceo" / "AGENTS.md"
+SCRIPT = ROOT / "scripts" / "build_guide.py"
+GUIDE = ROOT / "src" / "akceo" / "guide.md"
 
 
 @pytest.fixture(scope="module")
 def generator() -> Any:
-    spec = importlib.util.spec_from_file_location("build_agents_md", SCRIPT)
+    spec = importlib.util.spec_from_file_location("build_guide", SCRIPT)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -21,9 +21,7 @@ def generator() -> Any:
 
 
 def test_the_packaged_guide_is_current(generator: Any):
-    assert GUIDE.read_text(encoding="utf-8") == generator.build(), (
-        "run: uv run python scripts/build_agents_md.py"
-    )
+    assert GUIDE.read_text(encoding="utf-8") == generator.build(), "run: uv run python scripts/build_guide.py"
 
 
 def test_the_guide_holds_the_syntax_reference_and_the_demo_deck():
@@ -38,19 +36,30 @@ def test_headings_in_code_fences_stay_as_written(generator: Any):
     text = (
         "# Title\n\n```markdown\n# My Talk\n## Agenda\n```\n\n"
         "## Next\n\n````\n```\n# kept\n````\n#5 is a link\n\n"
-        "```\n```markdown\n# inside\n`````  \n# after\n"
+        "```\n```markdown\n# inside\n`````  \n# after\n\n"
+        "~~~\n# tilde\n   ~~~\n# closed by an indented fence\n\n"
+        "```\n~~~\n# still code\n```\n# Last\n"
     )
     assert generator.demoted(text) == (
         "## Title\n\n```markdown\n# My Talk\n## Agenda\n```\n\n"
         "### Next\n\n````\n```\n# kept\n````\n#5 is a link\n\n"
-        "```\n```markdown\n# inside\n`````  \n## after"
+        "```\n```markdown\n# inside\n`````  \n## after\n\n"
+        "~~~\n# tilde\n   ~~~\n## closed by an indented fence\n\n"
+        "```\n~~~\n# still code\n```\n## Last"
     )
+
+
+def test_a_level_6_heading_is_refused(generator: Any):
+    with pytest.raises(ValueError, match="line 3: a level-6 heading has no level below it"):
+        generator.demoted("# Title\n\n###### Too deep\n")
 
 
 @pytest.mark.parametrize(
     ("text", "refused"),
     [
         ("See [how it works](how-it-works.md).", True),
+        ("See [how it works][works].\n\n[works]: how-it-works.md", True),
+        ("[repo]: https://github.com/LunarCommand/akceo", False),
         ("See [Images](#images) and [the repo](https://github.com/LunarCommand/akceo).", False),
         ("Write `[text](url)` for a link.", False),
         ("```\n[text](url)\n```", False),
@@ -63,7 +72,14 @@ def test_a_link_to_another_file_is_refused(
     (tmp_path / "doc.md").write_text(text, encoding="utf-8")
     monkeypatch.setattr(generator, "ROOT", tmp_path)
     if refused:
-        with pytest.raises(SystemExit, match="doc.md links to another file"):
+        with pytest.raises(SystemExit, match="doc.md: links to another file"):
             generator._read("doc.md")
     else:
         assert generator._read("doc.md") == text
+
+
+def test_a_code_fence_left_open_is_refused(generator: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    (tmp_path / "doc.md").write_text("# Doc\n\n```\ncode\n", encoding="utf-8")
+    monkeypatch.setattr(generator, "ROOT", tmp_path)
+    with pytest.raises(SystemExit, match="doc.md: line 3: the code fence that opens here isn't closed"):
+        generator._read("doc.md")

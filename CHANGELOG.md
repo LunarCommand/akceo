@@ -25,9 +25,10 @@ All notable changes to this project are documented here. The format follows
   stops with how much each image uses (#21).
 - A guide for AI agents that write decks comes with akceo: the format, tips, and the demo deck
   as an example. `akceo docs` prints where it is, and `akceo docs --print` prints it.
-- `akceo init` adds a section to `AGENTS.md` and `CLAUDE.md` in a folder, creating them if
-  needed, that tells an agent to read the guide and to run `akceo check` after every edit. A
-  second run changes nothing, and `--dry-run` shows what it would do.
+- `akceo init` adds a section to the end of `AGENTS.md` and `CLAUDE.md` in a folder, creating
+  them if needed, that tells an agent to read the guide and to run `akceo check` after every
+  edit. The rest of each file stays as it was. A second run changes nothing, `--dry-run` shows
+  what it would do, and a file that links outside the folder is left alone.
 
 ### Changed
 

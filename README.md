@@ -95,10 +95,10 @@ akceo docs --print   # prints the guide
 akceo init           # points agents to it from AGENTS.md and CLAUDE.md in this folder
 ```
 
-`akceo init` adds a short section to `AGENTS.md` and `CLAUDE.md`, and creates either file if it
-doesn't exist. The section tells an agent to read the guide before it starts and to run
-`akceo check` after every edit. Running `init` again changes nothing, and `--dry-run` shows what
-it would do.
+`akceo init` adds a short section to the end of `AGENTS.md` and `CLAUDE.md`, and creates either
+file if it doesn't exist. The section tells an agent to read the guide before it starts and to run
+`akceo check` after every edit. The rest of each file stays as it was, line endings included.
+Running `init` again changes nothing, and `--dry-run` shows what it would do.
 
 ## Layouts
 

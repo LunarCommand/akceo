@@ -51,10 +51,10 @@ def test_non_utf8_theme_names_the_line(tmp_path: Path):
 def test_theme_read_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     (tmp_path / "brand.css").write_text(FULL)
 
-    def denied(self: Path, encoding: str | None = None) -> str:
+    def denied(self: Path, *args: object, **kwargs: object) -> str:
         raise PermissionError(13, "Permission denied")
 
-    monkeypatch.setattr(Path, "read_text", denied)
+    monkeypatch.setattr(Path, "open", denied)
     with pytest.raises(DeckError, match=r"brand\.css: Permission denied$"):
         themes.load("brand.css", tmp_path)
 

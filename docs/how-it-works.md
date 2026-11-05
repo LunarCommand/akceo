@@ -212,7 +212,7 @@ flowchart TD
     render --> assets[["assets/<br/>page.html · base.css · deck.js · diagrams.js"]]
     themes --> builtin[["themes/<br/>midnight.css · paper.css"]]
     cli --> viewer[["assets/md-viewer.html"]]
-    cli --> guide[["AGENTS.md · assets/init-block.md"]]
+    cli --> guide[["guide.md · assets/init-block.md"]]
     parse -.->|raises| err["errors.py<br/>DeckError"]
     themes -.->|raises| err
     images -.->|raises| err
@@ -484,15 +484,19 @@ aren't showing yet. See [Diagrams](#diagrams).
 
 ### The guide for agents
 
-`src/akceo/AGENTS.md` ships in the package. It's the guide that `akceo docs` prints, for an AI
-agent writing a deck. `scripts/build_agents_md.py` generates it from `docs/agent/tldr.md`,
-`docs/syntax.md`, `docs/agent/deck-recipes.md` and the demo deck, so the format reference has
-one source. A test fails while the committed guide differs from what the script writes.
+`src/akceo/guide.md` ships in the package. It's the guide that `akceo docs` prints, for an AI
+agent writing a deck. It isn't named `AGENTS.md`, because some coding agents read an `AGENTS.md`
+as instructions for the folder it's in, and this one is about decks, not akceo's code.
+`scripts/build_guide.py` generates it from `docs/agent/tldr.md`, `docs/syntax.md`,
+`docs/agent/deck-recipes.md` and the demo deck, so the format reference has one source. A test
+fails while the committed guide differs from what the script writes.
 
-`akceo init` adds `assets/init-block.md` to a folder's `AGENTS.md` and `CLAUDE.md`, which is
+`akceo init` appends `assets/init-block.md` to a folder's `AGENTS.md` and `CLAUDE.md`, which is
 where coding agents look for instructions. The block tells an agent to read the guide and to run
-`akceo check` after every edit. It carries an `<!-- akceo-init -->` comment, so a second run
-finds it and changes nothing.
+`akceo check` after every edit. It reads both files before it writes either, keeps each file's
+line endings, and won't follow a link out of the folder. The block ends with an
+`<!-- akceo-init -->` comment, so a second run finds it and changes nothing, and a write cut off
+partway doesn't count as done.
 
 ### The notes viewer
 
