@@ -32,9 +32,9 @@ def test_text_is_colored_only_with_text_tokens():
 
 @pytest.mark.parametrize("name", ["midnight", "paper"])
 def test_builtin_text_tokens_are_readable_on_the_background(name: str):
-    # WCAG 2.2 §1.4.3: text needs 4.5:1 against its background.
+    # WCAG 2.2 §1.4.3: text needs 4.5:1 against its background, compared unrounded.
     tokens = themes.values(themes.load(name, Path("/unused")))
-    ratios = {t: round(contrast(tokens[t], tokens["bg"]), 2) for t in TEXT_TOKENS}
+    ratios = {t: contrast(tokens[t], tokens["bg"]) for t in TEXT_TOKENS}
     assert {t: r for t, r in ratios.items() if r < 4.5} == {}
 
 
