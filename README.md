@@ -84,6 +84,22 @@ stays on the slide you were on.
 <https://lunarcommand.github.io/akceo/>. The same file is `examples/demo/deck.html`, which opens
 straight from disk too. Build it yourself with `akceo build examples/demo/deck.md`.
 
+## For AI agents
+
+akceo comes with a guide for an AI agent that writes decks: the format, tips that work, and the
+demo deck as an example.
+
+```sh
+akceo docs           # prints where the guide is
+akceo docs --print   # prints the guide
+akceo init           # points agents to it from AGENTS.md and CLAUDE.md in this folder
+```
+
+`akceo init` adds a short section to `AGENTS.md` and `CLAUDE.md`, and creates either file if it
+doesn't exist. The section tells an agent to read the guide before it starts and to run
+`akceo check` after every edit. Running `init` again changes nothing, and `--dry-run` shows what
+it would do.
+
 ## Layouts
 
 | Layout | For | Content |

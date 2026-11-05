@@ -23,6 +23,11 @@ All notable changes to this project are documented here. The format follows
   `#crop=` and `#max=` after the path crop or size it. A missing file stops the build with the
   diagram's line, and a diagram that its images push over Mermaid's 50,000-character limit
   stops with how much each image uses (#21).
+- A guide for AI agents that write decks comes with akceo: the format, tips, and the demo deck
+  as an example. `akceo docs` prints where it is, and `akceo docs --print` prints it.
+- `akceo init` adds a section to `AGENTS.md` and `CLAUDE.md` in a folder, creating them if
+  needed, that tells an agent to read the guide and to run `akceo check` after every edit. A
+  second run changes nothing, and `--dry-run` shows what it would do.
 
 ### Changed
 

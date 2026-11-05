@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from akceo import render
+from akceo import cli, render
 from akceo.cli import main
 
 ROOT = Path(__file__).parents[1]
@@ -322,6 +322,83 @@ def test_viewer_out_may_be_a_folder_or_a_file(tmp_path: Path):
     assert (tmp_path / "md-viewer.html").is_file()
     assert main(["viewer", "-o", str(tmp_path / "notes.html")]) == 0
     assert (tmp_path / "notes.html").is_file()
+
+
+GUIDE = ROOT / "src" / "akceo" / "AGENTS.md"
+SECTION = (ROOT / "src" / "akceo" / "assets" / "init-block.md").read_text()
+NEXT = "next: run akceo docs --print and read the guide before writing a deck\n"
+
+
+def test_docs_prints_where_the_guide_is(capsys: pytest.CaptureFixture[str]):
+    assert main(["docs"]) == 0
+    path = Path(capsys.readouterr().out.removesuffix("\n"))
+    assert path.is_absolute() and path.read_text() == GUIDE.read_text()
+
+
+def test_docs_print_prints_the_guide(capsys: pytest.CaptureFixture[str]):
+    assert main(["docs", "--print"]) == 0
+    assert capsys.readouterr().out == GUIDE.read_text()
+
+
+def test_init_writes_both_files(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    assert main(["init", str(tmp_path)]) == 0
+    assert (tmp_path / "AGENTS.md").read_text() == (tmp_path / "CLAUDE.md").read_text() == SECTION
+    out = capsys.readouterr().out
+    assert out == f"wrote {tmp_path / 'AGENTS.md'}\nwrote {tmp_path / 'CLAUDE.md'}\n{NEXT}"
+
+
+@pytest.mark.parametrize(
+    ("existing", "after"),
+    [("# Notes\n\nKeep it short.\n", "# Notes\n\nKeep it short.\n\n" + SECTION), ("\n", SECTION)],
+)
+def test_init_adds_to_a_file_that_exists(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], existing: str, after: str
+):
+    (tmp_path / "CLAUDE.md").write_text(existing)
+    assert main(["init", str(tmp_path)]) == 0
+    assert (tmp_path / "CLAUDE.md").read_text() == after
+    assert f"added the akceo section to {tmp_path / 'CLAUDE.md'}\n" in capsys.readouterr().out
+
+
+def test_init_again_changes_nothing(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    (tmp_path / "CLAUDE.md").write_text("# Notes\n")
+    main(["init", str(tmp_path)])
+    before = {path.name: path.read_text() for path in tmp_path.iterdir()}
+    capsys.readouterr()
+    assert main(["init", str(tmp_path)]) == 0
+    assert {path.name: path.read_text() for path in tmp_path.iterdir()} == before
+    assert capsys.readouterr().out == (
+        f"{tmp_path / 'AGENTS.md'} already has the akceo section\n"
+        f"{tmp_path / 'CLAUDE.md'} already has the akceo section\n{NEXT}"
+    )
+
+
+def test_init_dry_run_changes_nothing(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    (tmp_path / "CLAUDE.md").write_text("# Notes\n")
+    assert main(["init", "--dry-run", str(tmp_path)]) == 0
+    assert [path.name for path in tmp_path.iterdir()] == ["CLAUDE.md"]
+    assert (tmp_path / "CLAUDE.md").read_text() == "# Notes\n"
+    assert capsys.readouterr().out == (
+        f"would write {tmp_path / 'AGENTS.md'}\n"
+        f"would add the akceo section to {tmp_path / 'CLAUDE.md'}\n{NEXT}"
+    )
+
+
+def test_init_defaults_to_the_working_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    monkeypatch.chdir(tmp_path)
+    assert main(["init"]) == 0
+    assert capsys.readouterr().out == f"wrote AGENTS.md\nwrote CLAUDE.md\n{NEXT}"
+
+
+def test_init_needs_a_folder(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    assert main(["init", str(tmp_path / "decks")]) == 1
+    assert capsys.readouterr().err == f"akceo: {tmp_path / 'decks'}: not a folder\n"
+
+
+def test_the_section_carries_the_marker_init_looks_for():
+    assert SECTION.count(cli.INIT_MARKER) == 1
 
 
 def test_packaged_assets_contain_no_raw_control_characters():

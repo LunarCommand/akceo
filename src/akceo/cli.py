@@ -6,10 +6,13 @@ from collections.abc import Sequence
 from importlib.metadata import version
 from pathlib import Path
 
-from akceo import render, themes
+from akceo import files, render, themes
 from akceo.errors import DeckError
 
 VIEWER = "md-viewer.html"
+GUIDE = Path(__file__).with_name("AGENTS.md")
+INIT_MARKER = "<!-- akceo-init -->"
+INIT_FILES = ("AGENTS.md", "CLAUDE.md")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -36,6 +39,17 @@ def _parser() -> argparse.ArgumentParser:
     viewer.add_argument(
         "-o", "--out", type=Path, default=Path(VIEWER), help=f"output file or folder (default: ./{VIEWER})"
     )
+
+    docs = commands.add_parser("docs", help="print where the guide to writing decks is, for AI agents")
+    docs.add_argument("--print", action="store_true", dest="text", help="print the guide itself")
+
+    init = commands.add_parser(
+        "init", help="add a section that points AI agents to the guide to AGENTS.md and CLAUDE.md"
+    )
+    init.add_argument(
+        "folder", type=Path, nargs="?", default=Path("."), help="the folder the decks are in (default: .)"
+    )
+    init.add_argument("--dry-run", action="store_true", help="say what would change, and change nothing")
     return parser
 
 
@@ -48,6 +62,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             _check(args.deck, args.theme)
         elif args.command == "viewer":
             _write_viewer(args.out)
+        elif args.command == "docs":
+            _docs(args.text)
+        elif args.command == "init":
+            _init(args.folder, args.dry_run)
         else:
             _list_themes()
     except DeckError as e:
@@ -78,6 +96,36 @@ def _write_viewer(out: Path) -> None:
         out = out / VIEWER
     _write(out, (render.ASSETS / VIEWER).read_text(encoding="utf-8"))
     print(f"wrote {out}")
+
+
+def _docs(text: bool) -> None:
+    if text:
+        print(GUIDE.read_text(encoding="utf-8"), end="")
+    else:
+        print(GUIDE)
+
+
+def _init(folder: Path, dry_run: bool) -> None:
+    """Add the section that points agents to the guide to each of INIT_FILES in folder, creating the
+    file if it's missing. A file that already has the section is left as it is."""
+    if not folder.is_dir():
+        raise DeckError(f"{folder}: not a folder")
+    section = (render.ASSETS / "init-block.md").read_text(encoding="utf-8")
+    for name in INIT_FILES:
+        path = folder / name
+        if not path.exists():
+            text, done, would = section, "wrote", "would write"
+        else:
+            existing = files.read_text(path, "file").rstrip()
+            if INIT_MARKER in existing:
+                print(f"{path} already has the akceo section")
+                continue
+            text = (existing + "\n\n" if existing else "") + section
+            done, would = "added the akceo section to", "would add the akceo section to"
+        if not dry_run:
+            _write(path, text)
+        print(f"{would if dry_run else done} {path}")
+    print("next: run akceo docs --print and read the guide before writing a deck")
 
 
 def _write(out: Path, text: str) -> None:
