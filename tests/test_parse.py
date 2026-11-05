@@ -225,20 +225,23 @@ def test_paragraph_starting_like_a_block_marker_terminates():
             '---\nstyle-lead: background-image:image-set("a.png" 1x)\n\n## A\n',
             "deck.md:2: slide 1: 'style-lead' can't reference files or URLs",
         ),
+        # Content the layout doesn't take names the line its block starts on.
         (
             "---\n## A\n\n| a | b |\n",
-            "slide 1: a | table isn't used by the bullets layout, which takes a ## heading, "
+            "deck.md:4: slide 1: a | table isn't used by the bullets layout, which takes a ## heading, "
             "a > lead, a - list and a paragraph",
         ),
         (
             "---\nlayout: table\n\n## A\n| a | b |\n\nClosing words.\n",
-            "a paragraph isn't used by the table layout, which takes a ## heading and a | table",
+            "deck.md:7: slide 1: a paragraph isn't used by the table layout, which takes a ## heading and "
+            "a | table",
         ),
-        ("---\nlayout: title\n\n## A\n", "isn't used by the title layout, which takes a # heading"),
-        ("---\n## A\n\n- one\n\nMiddle.\n\n- two\n", "the bullets layout takes only one - list"),
-        ("---\nlayout: steps\n\n## A\n\nNo list.\n", "the steps layout needs a 1. list"),
-        ("---\n- no heading\n", "the bullets layout needs a ## heading"),
-        ("---\n## One\n---\n## Two\n\n# Big\n", "deck.md:4: slide 2: a # heading isn't used"),
+        ("---\nlayout: title\n\n## A\n", "deck.md:4: slide 1: a ## heading isn't used by the title layout"),
+        ("---\n## A\n\n- one\n\nMiddle.\n\n- two\n", "deck.md:8: slide 1: the bullets layout takes only one"),
+        ("---\n## One\n---\n## Two\n\n# Big\n", "deck.md:6: slide 2: a # heading isn't used"),
+        # Content that's missing names the line the slide starts on.
+        ("---\nlayout: steps\n\n## A\n\nNo list.\n", "deck.md:2: slide 1: the steps layout needs a 1. list"),
+        ("---\n- no heading\n", "deck.md:2: slide 1: the bullets layout needs a ## heading"),
     ],
 )
 def test_errors_name_line_and_slide(source: str, message: str):
@@ -460,7 +463,7 @@ def test_bad_links_name_the_slide(text: str, message: str):
     with pytest.raises(DeckError) as e:
         parse(f"---\n## A\n---\nkicker: K\n\n## B\n\n- {text}\n", Path("deck.md"))
     allowed = "; a link goes to an https:, http: or mailto: address, or to a slide as #N"
-    assert str(e.value) == f"deck.md:4: slide 2: {message}" + ("" if "goes past" in message else allowed)
+    assert str(e.value) == f"deck.md:8: slide 2: {message}" + ("" if "goes past" in message else allowed)
 
 
 def test_a_slide_link_past_ints_digit_limit_goes_past_the_last_slide():
@@ -512,7 +515,37 @@ def test_a_url_cant_continue_onto_the_next_line():
         parse("---\n## A\n\n- see [x](https://x.example/a\\\nb) now\n", Path("deck.md"))
     assert (
         str(e.value)
-        == "deck.md:2: slide 1: a link's URL can't continue onto the next line ('https://x.example/a\\b')"
+        == "deck.md:4: slide 1: a link's URL can't continue onto the next line ('https://x.example/a\\b')"
     )
     # A hard break in the link text is fine.
     assert deck("---\n## A\n\n- [two\\\nlines](https://x.example)\n").has_links()
+
+
+def test_a_block_names_the_line_it_starts_on_past_notes_and_joined_lines():
+    source = (
+        "---\n"  # 1
+        "kicker: K\n// a note among the keys\n\n"  # 2-4
+        "## A\n\n"  # 5-6
+        "A paragraph that\n  wraps, with a break\\\nhere.\n// a note\n\n"  # 7-11
+        "| a | b |\n| c | d |\n"  # 12-13
+    )
+    with pytest.raises(DeckError) as e:
+        parse(source, Path("deck.md"))
+    assert str(e.value).startswith("deck.md:12: slide 1: a | table isn't used by the bullets layout")
+
+
+@pytest.mark.parametrize(
+    ("source", "line"),
+    [
+        # A key's text, such as the kicker, names the line the slide starts on.
+        ("---\n\nkicker: [x](ftp://x)\n\n## T\n", 3),
+        # Text in a block names the block's first line, even for a later row or joined line.
+        ("---\nlayout: table\n\n## T\n| a | b |\n| c | [x](ftp://x) |\n", 5),
+        ("---\n## T\n\nIntro\n  more [x](ftp://x)\n", 4),
+        ("---\n## T\n\n- one\n- [x](ftp://x)\n", 4),
+    ],
+)
+def test_a_bad_link_names_the_line_of_its_block(source: str, line: int):
+    with pytest.raises(DeckError) as e:
+        parse(source, Path("deck.md"))
+    assert str(e.value).startswith(f"deck.md:{line}: slide 1: can't link to 'ftp://x'")
