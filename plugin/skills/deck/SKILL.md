@@ -20,8 +20,10 @@ to a file, read that file to the end.
   `uv run akceo`, `.venv/bin/akceo` or `python -m akceo`. If one works, use it for the commands
   below. If none does, offer to install akceo with `uv tool install akceo`, or
   `pipx install akceo`, and wait for the user's yes.
-- If akceo says `docs` isn't one of its commands, it's older than 0.3.0. Offer to upgrade it with
-  `uv tool upgrade akceo`, or `pipx upgrade akceo`, and wait for the user's yes.
+- If akceo says `docs` isn't one of its commands, it's older than 0.3.0. Offer to upgrade the copy
+  you ran: `uv tool upgrade akceo` or `pipx upgrade akceo` for one installed as a tool, or the
+  project's own way for one in a project, such as `uv add 'akceo>=0.3.0'`. Wait for the user's
+  yes, then run the guide command again the same way.
 
 ## 2. Get the brief (a new deck)
 
