@@ -413,6 +413,7 @@ def test_the_report_places_a_diagram_error(tmp_path: Path, monkeypatch: pytest.M
                 "text": f"deck.md:4: slide 2: flow.mmd:1: {message}",
             }
         ],
+        "warnings": [],
     }
 
 
@@ -433,7 +434,10 @@ def test_check_json_prints_the_report(
     Path("deck.md").write_text("---\n## One\n---\n## Two\n")
     assert main(["check", "--json", "deck.md"]) == 0
     out, err = capsys.readouterr()
-    assert (json.loads(out), err) == ({"ok": True, "deck": "deck.md", "slides": 2, "errors": []}, "")
+    assert (json.loads(out), err) == (
+        {"ok": True, "deck": "deck.md", "slides": 2, "errors": [], "warnings": []},
+        "",
+    )
 
     Path("deck.md").write_text("---\nfoo: bar\n")
     assert main(["check", "--json", "deck.md"]) == 1

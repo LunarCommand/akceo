@@ -21,10 +21,10 @@ LINK = "\x02"  # brackets the index of a stashed link, rendered on its own so no
 NEW_TAB = ' target="_blank" rel="noopener noreferrer"'
 
 
-def build(deck_path: Path, theme: str | None = None) -> tuple[str, int]:
+def build(deck_path: Path, theme: str | None = None) -> tuple[str, Deck]:
     """Build the page for the deck at deck_path. A theme passed here overrides the deck's own `theme:`
     and resolves against the working directory; the deck's resolves against the deck's folder.
-    Returns the HTML and the slide count."""
+    Returns the HTML and the parsed deck."""
     deck = parse.load(deck_path)
     if theme is not None:
         theme_css = themes.load(theme, Path.cwd())
@@ -59,7 +59,7 @@ def build(deck_path: Path, theme: str | None = None) -> tuple[str, int]:
         "DIAGRAMS": _diagram_scripts(theme_css) if any(map(_is_diagram, deck.slides)) else "",
     }
     page = PLACEHOLDER.sub(lambda m: values[m.group(1)], _asset("page.html"))
-    return page, len(sections)
+    return page, deck
 
 
 def _asset(name: str) -> str:

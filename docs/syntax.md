@@ -380,3 +380,21 @@ reading the message. A code is never renamed or reused.
 | `init-not-folder` | `akceo init` was given something that isn't a folder |
 | `init-link-outside` | `AGENTS.md` or `CLAUDE.md` links to a file outside the folder |
 | `init-broken-link` | `AGENTS.md` or `CLAUDE.md` links to a file that doesn't exist |
+
+## Warning codes
+
+A warning is about something that builds but probably isn't what you meant. `akceo check` and
+`akceo build` print each one and carry on; `akceo check --json` lists them. Each code is given at
+most once a slide, at its first line. A deck with an error gets no warnings, since the error is
+what to fix first, but a layout error that one of these lines causes gives the warning's reason
+too.
+
+| Code | Given when |
+| --- | --- |
+| `slide-dense` | A slide has more than 100 words. akceo can't tell whether it overflows, so look at the built page |
+| `image-placeholder` | A `split` or `image` slide has no `image:` yet, so it shows a dashed box |
+| `markdown-code-fence` | A line starts with ```` ``` ```` or `~~~`. akceo has no code blocks yet, so it shows as text |
+| `markdown-nested-list` | An indented list item, which joins the item above it as text |
+| `markdown-bullet` | A list item that starts with `*` or `+`, which shows as text |
+| `markdown-heading` | A heading with four or more `#`, which shows as text |
+| `key-in-text` | A slide key written as text: in lowercase anywhere in the slide's text, or capitalized at its top, where keys go |
