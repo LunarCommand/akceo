@@ -525,7 +525,6 @@ This slide uses the ***bullets*** layout: a heading, a list and a closing paragr
 ---
 
 kicker: Inline markup
-style-lead: max-width:40ch;margin-bottom:3vh
 
 ## A small set of marks
 
@@ -545,7 +544,6 @@ layout: split
 kicker: How it works
 image: flow.svg
 image-alt: deck.md and a theme go into akceo build, which writes deck.html
-style-h2: margin-bottom:3vh
 
 ## One command,\
 one file

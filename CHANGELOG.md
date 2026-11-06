@@ -58,6 +58,9 @@ All notable changes to this project are documented here. The format follows
 
 - The key hint in the corner of the deck was hard to read. It used `--line`, which in both
   built-in themes is close to the background. It now uses `--muted`, like the slide count.
+- A list sat almost on top of a lead line above it, and now has room below the lead. On a
+  `steps` slide, the paragraph sat far below the heading and almost on top of the list. It now
+  sits under the heading, with room before the list.
 - A control character in a deck, such as a stray NUL, stops the build with its line. It
   used to crash with a Python traceback, or put invisible characters on the slide.
 - Ctrl-C during a command prints `akceo: interrupted` and exits with code 130, instead of
