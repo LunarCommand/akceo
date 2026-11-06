@@ -1,0 +1,15 @@
+{
+  "name": "akceo",
+  "description": "The akceo plugin for Claude Code: a skill that writes slide decks with akceo.",
+  "owner": {
+    "name": "LunarCommand",
+    "url": "https://github.com/LunarCommand"
+  },
+  "plugins": [
+    {
+      "name": "akceo",
+      "source": "./plugin",
+      "category": "productivity"
+    }
+  ]
+}

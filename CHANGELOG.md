@@ -42,6 +42,9 @@ All notable changes to this project are documented here. The format follows
   `akceo build` print them and carry on, and `akceo check --json` lists them under `warnings`,
   each with a code. A layout error that one of those lines causes gives the reason too, such as
   a `* item` making a second paragraph.
+- A Claude Code plugin, from this repository: `/plugin marketplace add LunarCommand/akceo`, then
+  `/plugin install akceo@akceo`. Its skill, `/akceo:deck`, asks for a brief, has you approve an
+  outline, writes the deck, runs `akceo check` until it passes, and builds the page.
 
 ### Changed
 

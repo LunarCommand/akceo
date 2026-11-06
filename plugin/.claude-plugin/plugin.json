@@ -1,0 +1,19 @@
+{
+  "name": "akceo",
+  "description": "Write slide decks with akceo: a brief, an outline to approve, then a deck that akceo checks and builds into one self-contained HTML file. Invoked as /akceo:deck.",
+  "version": "0.2.1",
+  "author": {
+    "name": "LunarCommand",
+    "url": "https://github.com/LunarCommand"
+  },
+  "homepage": "https://github.com/LunarCommand/akceo#readme",
+  "repository": "https://github.com/LunarCommand/akceo",
+  "license": "MIT",
+  "keywords": [
+    "slides",
+    "presentation",
+    "deck",
+    "markdown",
+    "html"
+  ]
+}

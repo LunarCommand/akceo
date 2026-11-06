@@ -101,6 +101,49 @@ file if it doesn't exist. The section tells an agent to read the guide before it
 `akceo check` after every edit. The rest of each file stays as it was, line endings included.
 Running `init` again changes nothing, and `--dry-run` shows what it would do.
 
+### The Claude Code plugin
+
+This repository is also a Claude Code plugin marketplace. Its plugin, `akceo`, has a skill that
+writes a deck with you: it asks for a brief, shows you an outline to approve, writes the deck,
+runs `akceo check` until it passes, and builds the page. Call it as `/akceo:deck`, or ask Claude
+for a deck. It needs the `akceo` command, and offers to install it if it's missing.
+
+In a Claude Code session:
+
+```
+/plugin marketplace add LunarCommand/akceo
+/plugin install akceo@akceo
+```
+
+The plugin changes with each akceo release. To get the new one, run
+`/plugin marketplace update akceo`.
+
+To try the skill from a branch, or to change it, add your clone instead. Claude Code runs the
+skill from the checkout as it stands, and `/reload-plugins` picks up an edit:
+
+```
+/plugin marketplace add /absolute/path/to/akceo
+/plugin install akceo@akceo
+```
+
+Use one or the other. Both add a marketplace named `akceo`, so to switch, first run
+`/plugin uninstall akceo@akceo` and `/plugin marketplace remove akceo`.
+
+The skill runs `akceo check` after every edit, and Claude Code asks before each run. To let
+`check` and `docs` run without asking, merge these rules into `~/.claude/settings.json`:
+
+```json
+{
+  "permissions": {
+    "allow": ["Bash(akceo check:*)", "Bash(akceo docs:*)"]
+  }
+}
+```
+
+Leave `akceo build` off the list. A rule approves the command with any options, and `build -o`
+writes wherever it's told, so an agent could overwrite any of your files without asking. The
+skill builds once or twice a deck, so the prompt costs little.
+
 ## Layouts
 
 | Layout | For | Content |
