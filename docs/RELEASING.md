@@ -33,8 +33,11 @@ that version's section of `CHANGELOG.md`.
    `docs/how-it-works.md`, `docs/speaker-notes.md` and the `--help` text in `src/akceo/cli.py`.
 
 3. **Set the version and date**, on a branch, in one commit:
-   - `pyproject.toml`: `version = "0.2.0"`. This is the only place the version is set; `akceo
-     --version` reads it from the installed package.
+   - `pyproject.toml`: `version = "0.2.0"`. `akceo --version` reads it from the installed
+     package.
+   - `plugin/.claude-plugin/plugin.json`: `"version": "0.2.0"`, the same. Claude Code offers
+     users the plugin again only when this changes, so a changed skill reaches them with the
+     release. A test fails while the two differ.
    - `CHANGELOG.md`: rename `## [Unreleased]` to `## [0.2.0] - YYYY-MM-DD` with the date you'll tag
      on, and add a new empty `## [Unreleased]` above it.
    - Run `uv lock`, so `uv.lock` records the new version.
@@ -69,6 +72,8 @@ that version's section of `CHANGELOG.md`.
 - GitHub: the repository's Releases page
 - A clean install: `uv tool install akceo==0.2.0`, then `akceo --version` and a build of
   `examples/demo/deck.md`
+- The plugin: in a Claude Code session with the marketplace added from GitHub, run
+  `/plugin marketplace update akceo`, and `/plugin` lists `akceo` at the new version
 
 ## Versions
 

@@ -43,6 +43,10 @@ dependencies are Pillow (images) and mini-racer (V8, to check Mermaid diagrams a
   `syntax.md` (format reference), `speaker-notes.md` (notes setup), `how-it-works.md`
   (design, with Mermaid diagrams), `branding.md`, `RELEASING.md` (how a tag becomes a PyPI
   release).
+- `plugin/`: the Claude Code plugin, and all that a user installs of it: its manifest, the `deck`
+  skill and a copy of the license. `.claude-plugin/marketplace.json` lists it, which makes the
+  repository its marketplace. The skill gives the order of work and leaves the format to the
+  guide, so it never repeats `docs/syntax.md`. `claude plugin validate .` checks both files.
 - `.github/workflows/`: `ci.yml` (checks on every push and PR), `release.yml` (a `v*.*.*` tag
   publishes to PyPI and creates the GitHub Release) and `pages.yml` (publishes the built demo to
   <https://lunarcommand.github.io/akceo/> when it changes on main).
@@ -77,6 +81,9 @@ uv run python scripts/build_guide.py
 - The page carries Mermaid packed, and the whole page must pass the external-reference test.
   Mermaid itself, unpacked, has its own narrower check.
 - Keep the `Unreleased` section of `CHANGELOG.md` current.
+- The plugin's version, in `plugin/.claude-plugin/plugin.json`, is akceo's, set in the same
+  release commit. Users get a changed skill only when that version changes. A test fails while
+  the two differ, or when the skill names an `akceo` command or option that doesn't exist.
 - `examples/demo/deck.html` is committed. Rebuild it with `uv run akceo build examples/demo/deck.md`
   after any change to the page: the demo, the assets, the `midnight` theme, the renderer, or
   Mermaid. A test fails while it is out of date.
