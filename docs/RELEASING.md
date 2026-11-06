@@ -51,12 +51,13 @@ that version's section of `CHANGELOG.md`.
 
    ```sh
    git checkout main && git pull
-   git tag v0.2.0
+   git tag -s -m "akceo 0.2.0" v0.2.0
    git push origin v0.2.0
    ```
 
    The tag must match the version in `pyproject.toml`. If the changelog date isn't today, fix it
-   before tagging.
+   before tagging. `-s` signs the tag with your key, so GitHub shows it as Verified, and a signed
+   tag needs the message that `-m` gives it.
 
 6. **The workflow does the rest:**
    - checks that the tag matches `pyproject.toml` and that `CHANGELOG.md` has a section for it,
