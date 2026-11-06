@@ -6,16 +6,20 @@ description: Write or edit a slide deck with akceo, which builds one self-contai
 # Write a deck with akceo
 
 akceo builds a slide deck from one Markdown file into one HTML file that loads nothing from
-outside. Its guide holds the format. This skill holds the order of work.
+outside. Its guide holds the format. This skill holds the order of work. The commands below name
+the deck `deck.md`; use the deck's own file name.
 
 ## 1. Read the guide
 
 Run `akceo docs --print` and read all of it before you write a slide. It comes from the installed
 akceo, so it always matches the version that builds the deck. Read it every time you start on a
-deck; don't write from memory.
+deck; don't write from memory. The guide is long: if the shell cuts the output short or saves it
+to a file, read that file to the end.
 
-- If the shell can't find `akceo`, it isn't installed. Offer to install it with
-  `uv tool install akceo`, or `pipx install akceo`, and wait for the user's yes.
+- If the shell can't find `akceo`, look for it in the project's own environment first:
+  `uv run akceo`, `.venv/bin/akceo` or `python -m akceo`. If one works, use it for the commands
+  below. If none does, offer to install akceo with `uv tool install akceo`, or
+  `pipx install akceo`, and wait for the user's yes.
 - If akceo says `docs` isn't one of its commands, it's older than 0.3.0. Offer to upgrade it with
   `uv tool upgrade akceo`, or `pipx upgrade akceo`, and wait for the user's yes.
 
@@ -40,8 +44,9 @@ takes only certain blocks.
 
 ## 4. Write
 
-- Give a new deck its own folder, with the deck in `deck.md` and each diagram in its own `.mmd`
-  file next to it.
+- Put a new deck where the user's other decks are, named the way they are. If there are none,
+  give it its own folder, with the deck in `deck.md`.
+- Put each diagram in its own `.mmd` file next to the deck.
 - Write only the Markdown the guide describes.
 - For an image that doesn't exist yet, leave out `image:`, and the slide shows where it goes.
   Never make up a file name.
@@ -56,8 +61,10 @@ it says.
 
 ## 6. Build and look
 
-Run `akceo build deck.md`, which writes `deck.html` next to the deck, and open the page for the
-user: `open deck.html` on macOS, `xdg-open deck.html` on Linux.
+Run `akceo build deck.md`, which writes `deck.html` next to the deck. If you're running on the
+user's own computer, open the page for them: `open deck.html` on macOS, `xdg-open deck.html` on
+Linux, `start deck.html` on Windows. Otherwise, such as in a cloud session, give them the file's
+path.
 
 `ok` means akceo found nothing wrong, not that every slide looks right. Tell the user which
 slides to look at: those with a diagram, which can show an error only when the page opens, and

@@ -129,17 +129,20 @@ skill from the checkout as it stands, and `/reload-plugins` picks up an edit:
 Use one or the other. Both add a marketplace named `akceo`, so to switch, first run
 `/plugin uninstall akceo@akceo` and `/plugin marketplace remove akceo`.
 
-The skill runs `akceo check`, `akceo build` and `akceo docs` many times, and Claude Code asks
-before each one. To let them run without asking, merge these rules into
-`~/.claude/settings.json`:
+The skill runs `akceo check` after every edit, and Claude Code asks before each run. To let
+`check` and `docs` run without asking, merge these rules into `~/.claude/settings.json`:
 
 ```json
 {
   "permissions": {
-    "allow": ["Bash(akceo check:*)", "Bash(akceo build:*)", "Bash(akceo docs:*)"]
+    "allow": ["Bash(akceo check:*)", "Bash(akceo docs:*)"]
   }
 }
 ```
+
+Leave `akceo build` off the list. A rule approves the command with any options, and `build -o`
+writes wherever it's told, so an agent could overwrite any of your files without asking. The
+skill builds once or twice a deck, so the prompt costs little.
 
 ## Layouts
 
