@@ -200,6 +200,9 @@ flowchart TD
     cli["cli.py<br/>akceo build / check / themes / viewer / docs / init"] --> render["render.py<br/>build()"]
     cli --> report["report.py<br/>check()"]
     report --> render
+    cli --> lint["lint.py<br/>find()"]
+    report --> lint
+    lint --> parse
     render --> parse["parse.py<br/>load(), validation"]
     parse --> files["files.py<br/>read_text()"]
     render --> themes["themes.py<br/>load(), token check"]
@@ -226,8 +229,9 @@ flowchart TD
 
 | Module | Job |
 | --- | --- |
-| `cli.py` | Parses arguments, runs a command, writes the output, turns `DeckError` into a message and exit code 1. `check` runs the build and writes nothing, and `check --json` prints what `report.py` returns. `docs` prints the guide for agents, and `init` points to it from a folder's `AGENTS.md` and `CLAUDE.md`. |
-| `report.py` | Runs the checks and returns the result as data, with the error's code and where it is: what `check --json` prints |
+| `cli.py` | Parses arguments, runs a command, writes the output, turns `DeckError` into a message and exit code 1. `check` runs the build and writes nothing, and `check --json` prints what `report.py` returns. Both `check` and `build` print the deck's warnings from `lint.py`. `docs` prints the guide for agents, and `init` points to it from a folder's `AGENTS.md` and `CLAUDE.md`. |
+| `report.py` | Runs the checks and returns the result as data, with the error's code and where it is, or the warnings: what `check --json` prints |
+| `lint.py` | Gives the warnings for a parsed deck: what builds but probably isn't what the author meant. The parser finds the stray lines, such as Markdown akceo doesn't read, and keeps them on each slide, so a layout error that one causes can give the reason too; `lint.py` adds the warnings about whole slides |
 | `render.py` | Runs the build: loads the deck and theme, embeds images, checks diagrams, renders each slide, fills the page template |
 | `parse.py` | Turns Markdown into a validated `Deck`. All input rules live here, except those that need the image itself, such as a crop past its edge, which `images.py` checks. |
 | `themes.py` | Finds a theme by name or path, checks that it sets every token, and reads the token values that Mermaid diagrams use |

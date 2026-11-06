@@ -1,12 +1,13 @@
 """Parse akceo's Markdown dialect into a validated deck. The format is described in docs/syntax.md."""
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlsplit
 
 from akceo import files
-from akceo.errors import Code, DeckError
+from akceo.errors import Code, DeckError, WarningCode
 
 LAYOUTS = ("title", "bullets", "split", "steps", "table", "image")
 DEFAULT_LAYOUT = "bullets"
@@ -22,6 +23,7 @@ LAYOUT_KEYS: dict[str, tuple[str, ...]] = {
     "image": ("image", "image-alt", "image-max", "image-crop", "image-frame"),
 }
 FLAG_KEYS = ("image-wide", "dim-last-column", "image-frame")
+SLIDE_KEYS = {*COMMON_KEYS, *(key for keys in LAYOUT_KEYS.values() for key in keys)}
 
 # Block kinds each layout renders, mapped to whether that kind may appear more than once.
 LAYOUT_BLOCKS: dict[str, dict[str, bool]] = {
@@ -73,6 +75,15 @@ CROP = re.compile(r"([0-9]{1,9})" + r"(?:\s*,\s*|\s+)([0-9]{1,9})" * 3)
 # C0 control characters, apart from tab, line feed, form feed and carriage return. The renderer
 # uses some as placeholders, and none of them belongs on a slide.
 CONTROL = re.compile(r"[\x00-\x08\x0b\x0e-\x1f]")
+# Markdown akceo doesn't read, and keys written as text, which stray_markdown() finds
+FENCE = re.compile(r"\s*(`{3,}|~{3,})")
+CLOSING_FENCE = re.compile(r"\s*(`{3,}|~{3,})\s*")
+NESTED_ITEM = re.compile(r"\s+(-|\d+\.) ")
+BULLET = re.compile(r"\s*([*+]) ")
+DEEP_HEADING = re.compile(r"(#{4,})(\s|$)")
+KEY_LIKE = re.compile(r"([A-Za-z][A-Za-z0-9-]*):")
+
+Stray = tuple[WarningCode, str]  # the warning for a line of slide text, and why it shows as text
 
 
 @dataclass(frozen=True)
@@ -91,6 +102,8 @@ class Slide:
     line: int
     meta: dict[str, str]
     blocks: tuple[Block, ...]
+    # The lines of slide text that show as text but were likely meant as something else, by line
+    stray: dict[int, Stray] = field(default_factory=dict[int, Stray], compare=False)
 
     @property
     def layout(self) -> str:
@@ -119,7 +132,7 @@ class Deck:
         return slide.meta.get("image-frame", self.config.get("image-frame", "yes")) == "yes"
 
     def has_links(self) -> bool:
-        texts = (text for slide in self.slides for _, text in _slide_texts(slide))
+        texts = (text for slide in self.slides for _, text in slide_texts(slide))
         return any(LINK.search(_without_code(text)) for text in texts)
 
 
@@ -183,7 +196,7 @@ def parse(text: str, path: Path) -> Deck:
     return Deck(path, config, tuple(slides), key_lines)
 
 
-def _slide_texts(slide: Slide) -> list[tuple[int, str]]:
+def slide_texts(slide: Slide) -> list[tuple[int, str]]:
     """Each text the slide shows, with the line it's on: a block's first line, or the slide's for
     the kicker and meta keys."""
     texts = [(slide.line, slide.meta.get("kicker", "")), (slide.line, slide.meta.get("meta", ""))]
@@ -203,7 +216,7 @@ def _without_code(text: str) -> str:
 def _check_links(path: Path, slide: Slide, count: int) -> None:
     """Every [text](url) must go to the web, to an email address, or to a slide in this deck. A
     link inside a code span is code, not a link."""
-    for line, text in _slide_texts(slide):
+    for line, text in slide_texts(slide):
         for m in LINK.finditer(_without_code(text)):
             url = m.group(2)
             written = text[m.start(2) : m.end(2)]
@@ -319,25 +332,86 @@ def _slide(path: Path, number: int, start: int, lines: list[str]) -> Slide:
         if key in STYLE_KEYS and STYLE_URL.search(value):
             raise fail("style-url", f"'{key}' can't reference files or URLs (url() or image-set())", line)
 
-    blocks = _blocks(*_logical_lines(body, start + len(lines) - len(body)))
+    body_start = start + len(lines) - len(body)
+    blocks = _blocks(*_logical_lines(body, body_start))
+    stray = stray_markdown(enumerate(body, body_start))
+
+    def fail_block(code: Code, message: str, block: Block) -> DeckError:
+        """An error about a block, with the reason when the block starts with a stray line."""
+        if block.line in stray:
+            reason = stray[block.line][1]
+            message += ". " + reason[0].upper() + reason[1:]
+        return fail(code, message, block.line)
+
     allowed = LAYOUT_BLOCKS[layout]
     seen: set[str] = set()
     for block in blocks:
         name = BLOCK_NAMES[block.kind]
         if block.kind not in allowed:
             takes = _join([BLOCK_NAMES[kind] for kind in allowed]) if allowed else "no content"
-            message = f"{name} isn't used by the {layout} layout, which takes {takes}"
-            raise fail("block-not-in-layout", message, block.line)
+            raise fail_block(
+                "block-not-in-layout", f"{name} isn't used by the {layout} layout, which takes {takes}", block
+            )
         if block.kind in seen and not allowed[block.kind]:
-            raise fail(
-                "block-repeated", f"the {layout} layout takes only one {name.split(' ', 1)[1]}", block.line
+            raise fail_block(
+                "block-repeated", f"the {layout} layout takes only one {name.split(' ', 1)[1]}", block
             )
         seen.add(block.kind)
     for kind in REQUIRED_BLOCKS[layout]:
         if kind not in seen:
             raise fail("block-missing", f"the {layout} layout needs {BLOCK_NAMES[kind]}")
 
-    return Slide(number, first, meta, tuple(blocks))
+    return Slide(number, first, meta, tuple(blocks), stray)
+
+
+def stray_markdown(lines: Iterable[tuple[int, str]]) -> dict[int, Stray]:
+    """Each of lines, the numbered lines of a slide's text, that shows as text but was likely meant as
+    something else, with its warning. Every line of a fenced block gets the fence's warning, since
+    all of it shows as text. A capitalized key counts only at the top, where keys go: further down,
+    "Image: a cat" is ordinary text."""
+    found: dict[int, Stray] = {}
+    fence: Stray | None = None
+    opened = ""
+    at_top = True
+    for number, line in lines:
+        if _is_author_note(line):
+            continue
+        mark = FENCE.match(line)
+        if fence is None and mark:
+            opened = mark[1]
+            fence = ("markdown-code-fence", f"{mark[1]} shows as text; akceo has no code blocks yet")
+            found[number] = fence
+        elif fence is not None:
+            found[number] = fence
+            if _closes(line, opened):
+                fence = None
+        else:
+            key = KEY_LIKE.match(line)
+            at_top = at_top and key is not None
+            if stray := _stray_line(line, key, at_top):
+                found[number] = stray
+    return found
+
+
+def _closes(line: str, opened: str) -> bool:
+    """CommonMark's rule: a fence closes on a run of its opening's character, at least as long,
+    with nothing after it but whitespace."""
+    closing = CLOSING_FENCE.fullmatch(line)
+    return bool(closing) and closing[1][0] == opened[0] and len(closing[1]) >= len(opened)
+
+
+def _stray_line(line: str, key: re.Match[str] | None, at_top: bool) -> Stray | None:
+    if NESTED_ITEM.match(line):
+        reason = "an indented list item joins the item above it as text; lists are one level deep"
+        return "markdown-nested-list", reason
+    if bullet := BULLET.match(line):
+        return "markdown-bullet", f"a list item that starts with {bullet[1]} shows as text; use - instead"
+    if heading := DEEP_HEADING.match(line):
+        return "markdown-heading", f"a {heading[1]} heading shows as text; use ## for the slide's heading"
+    if key and key[1].lower() in SLIDE_KEYS and (key[1].islower() or at_top):
+        where = "at the top of the slide, in lowercase, before the blank line"
+        return "key-in-text", f"'{key[0]}' shows as text; a key goes {where}"
+    return None
 
 
 def pixel_count(value: str, key: str) -> int:
